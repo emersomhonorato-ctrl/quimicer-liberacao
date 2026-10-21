@@ -639,7 +639,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
   </div></dialog>
 
 <dialog id="dDocs"><div class="hd"><div><div class="label" id="ddSub"></div><h2 style="font-size:22px" id="ddTitle"></h2></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
-  <div class="bd"><div style="overflow-x:auto;max-height:60vh"><table class="acc"><thead><tr><th>Data</th><th>Arquivo</th><th>Enviado em</th></tr></thead><tbody id="ddBody"></tbody></table></div></div></dialog>
+  <div class="bd"><div style="overflow-x:auto;max-height:60vh"><table class="acc"><thead><tr><th>Data</th><th>Arquivo</th><th>Enviado em</th><th></th></tr></thead><tbody id="ddBody"></tbody></table></div></div></dialog>
 
 <dialog id="dImport"><div class="hd"><div><div class="label">Matéria-prima</div><h2 style="font-size:22px">Importar pasta de laudos</h2></div><button class="x" type="button" data-close aria-label="Fechar" id="impClose">×</button></div>
   <div class="bd" style="display:flex;flex-direction:column;gap:12px">
@@ -1783,7 +1783,7 @@ function renderSpecDocs() {
   const pode = podeEsp() && S.assets;
   box.innerHTML = ['it', 'fds'].map(t => { const l = docsDe(p.nome, t);
     return `<div style="margin-bottom:8px"><div class="row" style="justify-content:space-between;align-items:center"><span class="label">${DOCT[t]}</span>${pode ? `<label class="btn small" style="cursor:pointer">Anexar PDF<input type="file" accept=".pdf,application/pdf" class="sr" data-docup="${t}"></label>` : ''}</div>`
-      + (l.length ? l.map((a, i) => `<div style="font-size:13px">${i === 0 ? '<span class="chip ok">Atual</span> ' : '<span class="src">anterior</span> '}${docLink(a)} <span class="src">${a.data ? dataBR(a.data) : ''}</span></div>`).join('') : '<div class="src" style="font-size:13px">Nenhum arquivo.</div>') + '</div>'; }).join('');
+      + (l.length ? l.map((a, i) => `<div style="font-size:13px">${i === 0 ? '<span class="chip ok">Atual</span> ' : '<span class="src">anterior</span> '}${docLink(a)} <span class="src">${a.data ? dataBR(a.data) : ''}</span>${podeExcluir() ? ` <button type="button" class="btn small danger" data-docdel="${t}" data-docid="${esc(a.id)}" data-docprod="${esc(p.nome)}">Excluir</button>` : ''}</div>`).join('') : '<div class="src" style="font-size:13px">Nenhum arquivo.</div>') + '</div>'; }).join('');
 }
 $('specDocs').addEventListener('change', async (e) => {
   const inp = e.target.closest('[data-docup]'); if (!inp || !inp.files[0]) return;
@@ -1795,8 +1795,26 @@ document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-docs]'); if (!b) return; e.preventDefault(); e.stopPropagation();
   const l = docsDe(b.dataset.docs, b.dataset.tipo);
   $('ddSub').textContent = DOCT[b.dataset.tipo]; $('ddTitle').textContent = b.dataset.docs;
-  $('ddBody').innerHTML = l.map((a, i) => `<tr><td class="mono">${a.data ? dataBR(a.data) : '—'}</td><td>${docLink(a)}${i === 0 ? ' <span class="chip ok">Atual</span>' : ''}</td><td class="src">${a.em ? dataBR(a.em.slice(0, 10)) : ''}</td></tr>`).join('');
+  $('ddBody').innerHTML = l.map((a, i) => `<tr><td class="mono">${a.data ? dataBR(a.data) : '—'}</td><td>${docLink(a)}${i === 0 ? ' <span class="chip ok">Atual</span>' : ''}</td><td class="src">${a.em ? dataBR(a.em.slice(0, 10)) : ''}</td><td>${podeExcluir() ? `<button type="button" class="btn small danger" data-docdel="${b.dataset.tipo}" data-docid="${esc(a.id)}" data-docprod="${esc(b.dataset.docs)}">Excluir</button>` : ''}</td></tr>`).join('');
   $('dDocs').showModal();
+}, true);
+async function removerDoc(nome, tipo, id) {
+  const key = docKey(nome), cur = DOCS.map.get(key); if (!cur) return;
+  const doc = { produto: cur.produto || normNome(nome), it: cur.it || [], fds: cur.fds || [], atualizadoEm: new Date().toISOString() };
+  doc[tipo] = doc[tipo].filter(a => a.id !== id);
+  await S.db.collection('docs_produto').doc(key).set(doc); DOCS.map.set(key, doc);
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-docdel]'); if (!b) return; e.preventDefault(); e.stopPropagation();
+  if (!podeExcluir()) return;
+  if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Confirmar exclusão'; setTimeout(() => { if (b.isConnected && b.dataset.armed) { delete b.dataset.armed; b.textContent = 'Excluir'; } }, 5000); return; }
+  b.disabled = true; const t = b.dataset.docdel, prod = b.dataset.docprod;
+  try {
+    await removerDoc(prod, t, b.dataset.docid); toast(`${DOCT[t]} excluído de ${prod}`);
+    if ($('dSpec').open) renderSpecDocs();
+    if ($('dDocs').open) { const l = docsDe(prod, t); if (!l.length) $('dDocs').close(); else b.closest('tr').remove(); }
+    if (S.tab === 'especificacoes') renderSpecs(); if (S.tab === 'laudos') renderLaudoDocs();
+  } catch { b.disabled = false; toast('Não foi possível excluir o arquivo.'); }
 }, true);
 // importação em lote: casa o nome do arquivo com o produto
 function limpaNomeDoc(n) {
