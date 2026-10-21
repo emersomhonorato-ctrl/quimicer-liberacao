@@ -1178,7 +1178,7 @@ function openRec(r) {
       try { await S.db.collection(coll('meses', r._mes)).doc(r.id).delete(); $('dRec').close(); toast(`Registro do lote ${r.lote} excluído`); }
       catch { del.textContent = 'Não foi possível excluir'; }
     };
-    act.append(ed, del);
+    act.append(ed); if (podeExcluir()) act.append(del);
   }
   $('dRec').showModal();
 }
@@ -1220,23 +1220,23 @@ function renderSpecs() {
     : list.length ? list.map(p => `<tr data-id="${esc(p.id)}"><td>${esc(p.nome)}${p.codigo ? ` <span class="src">cód. ${esc(p.codigo)}</span>` : ''}</td>`
       + faixas.map(x => `<td class="v">${rg(p[x.mn], p[x.mx])}${x.copo && p[x.copo] ? ` <span class="src">${esc(p[x.copo])}${x.k === 'visc' && isBrook(p) ? ' (cP)' : ''}</span>` : ''}</td>`).join('')
       + M.specText.map(t => `<td>${esc(p[t.k] || '—')}</td>`).join('')
-      + `<td class="xspec">${(p.extras || []).map(e => `<div>${esc(e.nome)}: ${extraRange(e)}</div>`).join('') || '—'}</td>${M.laudo ? `<td>${laudosDe(p.nome).length ? `<button type="button" class="btn small" data-laudosmp="${esc(p.nome)}">${laudosDe(p.nome).length} PDFs</button>` : '<span class="src">—</span>'}</td>` : ''}${M.docs ? `<td>${docsCell(p)}</td>` : ''}<td><div class="row" style="gap:6px;flex-wrap:nowrap">${p.ativo === false ? '<span class="chip na">Inativo</span>' : '<span class="chip ok">Ativo</span>'}${podeEsp() ? '<button type="button" class="btn small danger" data-delspec title="Excluir item">Excluir</button>' : ''}</div></td></tr>`).join('')
+      + `<td class="xspec">${(p.extras || []).map(e => `<div>${esc(e.nome)}: ${extraRange(e)}</div>`).join('') || '—'}</td>${M.laudo ? `<td>${laudosDe(p.nome).length ? `<button type="button" class="btn small" data-laudosmp="${esc(p.nome)}">${laudosDe(p.nome).length} PDFs</button>` : '<span class="src">—</span>'}</td>` : ''}${M.docs ? `<td>${docsCell(p)}</td>` : ''}<td><div class="row" style="gap:6px;flex-wrap:nowrap">${p.ativo === false ? '<span class="chip na">Inativo</span>' : '<span class="chip ok">Ativo</span>'}${podeExcluir() ? '<button type="button" class="btn small danger" data-delspec title="Excluir item">Excluir</button>' : ''}</div></td></tr>`).join('')
     : `<tr><td colspan="${nc}" class="empty">${d.itens.size ? 'Nenhum item com esse filtro.' : `Nenhuma especificação cadastrada. Use ${esc(M.novo)} para incluir a primeira.`}</td></tr>`;
   $('pCount').textContent = `${list.length} de ${d.itens.size} ${M.itemPl}`;
-  $('pPerm').textContent = podeEsp() ? 'Clique em uma linha para editar.' : 'Somente o administrador altera especificações.';
+  $('pPerm').textContent = podeEsp() ? 'Clique em uma linha para editar.' : 'Somente administrador e laboratório alteram especificações.';
   $('pNovo').hidden = !podeEsp(); $('pImport').hidden = !(M.laudo && podeEsp() && S.assets);
   document.querySelectorAll('[data-docimp]').forEach(b => b.hidden = !(M.docs && podeEsp() && S.assets));
 }
 $('pBusca').addEventListener('input', renderSpecs);
 $('pFiltro').addEventListener('change', renderSpecs);
-$('pBody').addEventListener('click', (e) => { if (e.target.closest('[data-laudosmp]')) return; const del = e.target.closest('[data-delspec]'); if (del) { specEditing = del.closest('tr').dataset.id; abrirExcl(); return; } const tr = e.target.closest('tr[data-id]'); if (tr && podeEsp()) openSpec(tr.dataset.id); });
+$('pBody').addEventListener('click', (e) => { if (e.target.closest('[data-laudosmp]')) return; const del = e.target.closest('[data-delspec]'); if (del && podeExcluir()) { specEditing = del.closest('tr').dataset.id; abrirExcl(); return; } const tr = e.target.closest('tr[data-id]'); if (tr && podeEsp()) openSpec(tr.dataset.id); });
 $('pNovo').addEventListener('click', () => openSpec(null));
 
 let specEditing = null;
 function openSpec(id) {
   const p = id ? st().itens.get(id) : {};
   specEditing = id;
-  $('specDel').hidden = !(id && podeEsp()); $('sMotivo').value = '';
+  $('specDel').hidden = !(id && podeExcluir()); $('sMotivo').value = '';
   $('dSpecTitle').textContent = id ? 'Editar especificação' : M.novo;
   const v = (x) => x == null ? '' : fmt(x);
   let h = `<div class="field full"><label for="sNome">Nome</label><input type="text" id="sNome" value="${esc(p.nome || '')}"></div>`;
@@ -1348,7 +1348,7 @@ function abrirExcl() {
   $('exMotivo').value = ''; $('exErr').hidden = true; $('dExcl').showModal(); $('exMotivo').focus();
 }
 $('exForm').addEventListener('submit', async (e) => {
-  e.preventDefault(); const id = specEditing; if (!id || !podeEsp()) return;
+  e.preventDefault(); const id = specEditing; if (!id || !podeExcluir()) return;
   const p = st().itens.get(id) || {}, motivo = $('exMotivo').value.trim();
   if (!motivo) { $('exErr').textContent = 'Informe o motivo da exclusão.'; $('exErr').hidden = false; return; }
   const b = $('exGo'); b.disabled = true;
@@ -1454,13 +1454,13 @@ function renderEsp() {
   const q = $('espBusca').value.trim().toUpperCase(), ft = $('espTipo').value;
   const l = espDe(M.key).filter(x => !ft || (ft === 'rev' ? x.tipo !== 'alteracao' : ft === 'exclusao' ? x.tipo === 'exclusao' : ft === 'inclusao' ? (x.tipo === 'inclusao' || x.tipo === 'reinclusao') : x.tipo === ft))
     .filter(x => !q || `${x.item} ${x.detalhe} ${x.motivo || ''}`.toUpperCase().includes(q));
-  $('espBody').innerHTML = l.map(x => `<tr><td class="mono">${String(x.rev).padStart(2, '0')}</td><td class="mono">${dataBR(x.data)}</td><td><span class="vchip ${ESPT[x.tipo]?.[0] || 'sem'}">${ESPT[x.tipo]?.[1] || esc(x.tipo)}</span></td><td>${esc(x.item || '—')}</td><td style="font-size:13px">${esc(x.motivo || '—')}</td><td style="font-size:13px">${esc(x.detalhe || '—')}</td><td>${esc(x.por || '—')}</td><td><div class="row" style="gap:6px;flex-wrap:nowrap">${x.tipo !== 'alteracao' ? `<button type="button" class="btn small" data-espass="${x.rev}" title="Lista de assinatura da revisão ${x.rev}">Lista</button>` : ''}${podeEsp() ? `<button type="button" class="btn small danger" data-espdel="${esc(x._id)}">Excluir</button>` : ''}</div></td></tr>`).join('')
+  $('espBody').innerHTML = l.map(x => `<tr><td class="mono">${String(x.rev).padStart(2, '0')}</td><td class="mono">${dataBR(x.data)}</td><td><span class="vchip ${ESPT[x.tipo]?.[0] || 'sem'}">${ESPT[x.tipo]?.[1] || esc(x.tipo)}</span></td><td>${esc(x.item || '—')}</td><td style="font-size:13px">${esc(x.motivo || '—')}</td><td style="font-size:13px">${esc(x.detalhe || '—')}</td><td>${esc(x.por || '—')}</td><td><div class="row" style="gap:6px;flex-wrap:nowrap">${x.tipo !== 'alteracao' ? `<button type="button" class="btn small" data-espass="${x.rev}" title="Lista de assinatura da revisão ${x.rev}">Lista</button>` : ''}${podeExcluir() ? `<button type="button" class="btn small danger" data-espdel="${esc(x._id)}">Excluir</button>` : ''}</div></td></tr>`).join('')
     || `<tr><td colspan="8" class="empty">${ESP.loaded ? 'Nenhuma modificação registrada ainda.' : 'Carregando…'}</td></tr>`;
   $('espCount').textContent = `${l.length} modificações`;
 }
 ['espBusca', 'espTipo'].forEach(id => $(id).addEventListener('input', renderEsp));
 $('espBody').addEventListener('click', async (e) => {
-  const b = e.target.closest('[data-espdel]'); if (!b) return;
+  const b = e.target.closest('[data-espdel]'); if (!b || !podeExcluir()) return;
   if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Confirmar'; setTimeout(() => { if (b.isConnected && b.dataset.armed) { delete b.dataset.armed; b.textContent = 'Excluir'; } }, 5000); return; }
   b.disabled = true; const id = b.dataset.espdel;
   try { await S.db.collection('esp_revisoes').doc(id).delete(); ESP.revs = ESP.revs.filter(x => x._id !== id); renderEsp(); const c = espAtual(M.key); toast(`Registro excluído · ESP na revisão ${c ? c.rev : '—'}`); }
@@ -2109,7 +2109,8 @@ const LOGO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAQDAwMDAgQ
 const LDEF = { linha1: 'LAUDO EMITIDO ELETRONICAMENTE, DISPENSA A ASSINATURA DO RESPONSÁVEL.', linha2: 'RESPONSÁVEL TÉCNICO CLAUDEMAR CORREA MADEIRA CRQ No. 13ª R 13200548' };
 const LZ = { rec: null, cur: null, ens: [], cfg: { ...LDEF }, all: [], started: false };
 const isFat = () => S.perfil === 'faturamento';
-function podeEsp() { return !!S.canEdit && S.perfil === 'admin'; }
+function podeEsp() { return !!S.canEdit && (S.perfil === 'admin' || S.perfil === 'laboratorio'); }
+function podeExcluir() { return !!S.canEdit && S.perfil === 'admin'; }
 $('lLinha1').value = LDEF.linha1; $('lLinha2').value = LDEF.linha2;
 const qtdTxt = (v) => { const n = parseNum(v); return n == null ? (String(v || '').trim() || '-') : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg'; };
 const fmtD = (n, d) => d ? n.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: 4 }) : fmt(n);
@@ -2536,7 +2537,7 @@ function docRef(path) {
 function makeClaudeShim(p) {
   const admin = p.perfil === 'administrador', espEdit = admin || p.perfil === 'qualidade';
   const db = { collection: (path) => collRef(path), doc: (path) => docRef(path) };
-  const user = { id: async () => S.uid, isOwner: async () => admin, canEdit: async () => admin, can: async () => true };
+  const user = { id: async () => S.uid, isOwner: async () => admin, canEdit: async () => admin || p.perfil === 'laboratorio', can: async () => true };
   const downloads = { async save({ filename, data }) { const blob = data instanceof Blob ? data : new Blob([data], { type: /\.pdf$/i.test(filename) ? 'application/pdf' : 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); return true; } };
   const assets = (admin || p.perfil === 'laboratorio') ? { async upload(file, opts = {}) { const path = `${opts.pasta === 'docs' ? 'docs/' : ''}${new Date().getFullYear()}/${crypto.randomUUID()}.pdf`; const { error } = await SB.storage.from('laudos-mp').upload(path, file, { contentType: 'application/pdf' }); if (error) throw { code: /size|large/i.test(error.message) ? 'too_large' : 'unavailable', message: error.message }; return { id: path, url: '' }; } } : null;
   const caps = { db, user, downloads, assets };
