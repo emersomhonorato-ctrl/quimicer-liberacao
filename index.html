@@ -1223,13 +1223,13 @@ function renderSpecs() {
       + `<td class="xspec">${(p.extras || []).map(e => `<div>${esc(e.nome)}: ${extraRange(e)}</div>`).join('') || '—'}</td>${M.laudo ? `<td>${laudosDe(p.nome).length ? `<button type="button" class="btn small" data-laudosmp="${esc(p.nome)}">${laudosDe(p.nome).length} PDFs</button>` : '<span class="src">—</span>'}</td>` : ''}${M.docs ? `<td>${docsCell(p)}</td>` : ''}<td><div class="row" style="gap:6px;flex-wrap:nowrap">${p.ativo === false ? '<span class="chip na">Inativo</span>' : '<span class="chip ok">Ativo</span>'}${podeExcluir() ? '<button type="button" class="btn small danger" data-delspec title="Excluir item">Excluir</button>' : ''}</div></td></tr>`).join('')
     : `<tr><td colspan="${nc}" class="empty">${d.itens.size ? 'Nenhum item com esse filtro.' : `Nenhuma especificação cadastrada. Use ${esc(M.novo)} para incluir a primeira.`}</td></tr>`;
   $('pCount').textContent = `${list.length} de ${d.itens.size} ${M.itemPl}`;
-  $('pPerm').textContent = podeEsp() ? 'Clique em uma linha para editar.' : 'Somente administrador e laboratório alteram especificações.';
-  $('pNovo').hidden = !podeEsp(); $('pImport').hidden = !(M.laudo && podeEsp() && S.assets);
-  document.querySelectorAll('[data-docimp]').forEach(b => b.hidden = !(M.docs && podeEsp() && S.assets));
+  $('pPerm').textContent = podeEsp() ? 'Clique em uma linha para editar.' : podeIncluir() ? `Você pode incluir itens novos${M.docs ? ' e anexar Inf. técnico / FDS (clique na linha)' : ''}${M.laudo ? ' e importar laudos' : ''}. Alterar itens existentes: administrador e laboratório.` : 'Somente administrador e laboratório alteram especificações.';
+  $('pNovo').hidden = !podeIncluir(); $('pImport').hidden = !(M.laudo && podeAnexar());
+  document.querySelectorAll('[data-docimp]').forEach(b => b.hidden = !(M.docs && podeAnexar()));
 }
 $('pBusca').addEventListener('input', renderSpecs);
 $('pFiltro').addEventListener('change', renderSpecs);
-$('pBody').addEventListener('click', (e) => { if (e.target.closest('[data-laudosmp]')) return; const del = e.target.closest('[data-delspec]'); if (del && podeExcluir()) { specEditing = del.closest('tr').dataset.id; abrirExcl(); return; } const tr = e.target.closest('tr[data-id]'); if (tr && podeEsp()) openSpec(tr.dataset.id); });
+$('pBody').addEventListener('click', (e) => { if (e.target.closest('[data-laudosmp]')) return; const del = e.target.closest('[data-delspec]'); if (del && podeExcluir()) { specEditing = del.closest('tr').dataset.id; abrirExcl(); return; } const tr = e.target.closest('tr[data-id]'); if (tr && (podeEsp() || (M.docs && podeAnexar()))) openSpec(tr.dataset.id); });
 $('pNovo').addEventListener('click', () => openSpec(null));
 
 let specEditing = null;
@@ -1256,7 +1256,11 @@ function openSpec(id) {
   M.specText.forEach(t => { h += `<div class="field${t.full ? ' full' : ''}"><label for="st_${t.k}">${esc(t.label)}</label><input type="text" id="st_${t.k}" placeholder="${esc(t.ph || '')}" value="${esc(p[t.k] || '')}"></div>`; });
   $('specFields').innerHTML = h;
   $('extrasList').innerHTML = ''; (p.extras || []).forEach(addExtraRow); extrasEmptyState();
-  $('specErr').hidden = true; renderSpecDocs(); $('dSpec').showModal();
+  $('specErr').hidden = true; renderSpecDocs();
+  const ro = !!id && !podeEsp();
+  $('specForm').querySelectorAll('#specFields input, #specFields select, #extrasList input, #extrasList select, #extrasList button, #addExtra, #sMotivo').forEach(el => el.disabled = ro);
+  $('specSave').hidden = ro; if (ro) $('dSpecTitle').textContent = 'Especificação (somente leitura)';
+  $('dSpec').showModal();
 }
 function extrasEmptyState() {
   const has = $('extrasList').querySelector('.xrow');
@@ -1306,7 +1310,7 @@ function readExtraSpecs() {
   return out;
 }
 $('specForm').addEventListener('submit', async (e) => {
-  e.preventDefault(); if (!podeEsp()) return;
+  e.preventDefault(); if (!(podeEsp() || (podeIncluir() && !specEditing))) return;
   const err = (m) => { $('specErr').textContent = m; $('specErr').hidden = false; };
   const nome = normNome($('sNome').value); if (!nome) return err('Informe o nome.');
   const old = specEditing ? st().itens.get(specEditing) : {};
@@ -1780,7 +1784,7 @@ async function subirDoc(f) { const r = await S.assets.upload(f, window.QC_CONFIG
 function renderSpecDocs() {
   const box = $('specDocs'); const p = specEditing ? st().itens.get(specEditing) : null;
   box.hidden = !(M.docs && p); if (box.hidden) return;
-  const pode = podeEsp() && S.assets;
+  const pode = podeAnexar();
   box.innerHTML = ['it', 'fds'].map(t => { const l = docsDe(p.nome, t);
     return `<div style="margin-bottom:8px"><div class="row" style="justify-content:space-between;align-items:center"><span class="label">${DOCT[t]}</span>${pode ? `<label class="btn small" style="cursor:pointer">Anexar PDF<input type="file" accept=".pdf,application/pdf" class="sr" data-docup="${t}"></label>` : ''}</div>`
       + (l.length ? l.map((a, i) => `<div style="font-size:13px">${i === 0 ? '<span class="chip ok">Atual</span> ' : '<span class="src">anterior</span> '}${docLink(a)} <span class="src">${a.data ? dataBR(a.data) : ''}</span>${podeExcluir() ? ` <button type="button" class="btn small danger" data-docdel="${t}" data-docid="${esc(a.id)}" data-docprod="${esc(p.nome)}">Excluir</button>` : ''}</div>`).join('') : '<div class="src" style="font-size:13px">Nenhum arquivo.</div>') + '</div>'; }).join('');
@@ -2129,6 +2133,8 @@ const LZ = { rec: null, cur: null, ens: [], cfg: { ...LDEF }, all: [], started: 
 const isFat = () => S.perfil === 'faturamento';
 function podeEsp() { return !!S.canEdit && (S.perfil === 'admin' || S.perfil === 'laboratorio'); }
 function podeExcluir() { return !!S.canEdit && S.perfil === 'admin'; }
+function podeIncluir() { return podeEsp() || (!!S.db && S.perfil === 'qualidade'); }
+function podeAnexar() { return podeIncluir() && !!S.assets; }
 $('lLinha1').value = LDEF.linha1; $('lLinha2').value = LDEF.linha2;
 const qtdTxt = (v) => { const n = parseNum(v); return n == null ? (String(v || '').trim() || '-') : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg'; };
 const fmtD = (n, d) => d ? n.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: 4 }) : fmt(n);
@@ -2557,7 +2563,7 @@ function makeClaudeShim(p) {
   const db = { collection: (path) => collRef(path), doc: (path) => docRef(path) };
   const user = { id: async () => S.uid, isOwner: async () => admin, canEdit: async () => admin || p.perfil === 'laboratorio', can: async () => true };
   const downloads = { async save({ filename, data }) { const blob = data instanceof Blob ? data : new Blob([data], { type: /\.pdf$/i.test(filename) ? 'application/pdf' : 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); return true; } };
-  const assets = (admin || p.perfil === 'laboratorio') ? { async upload(file, opts = {}) { const path = `${opts.pasta === 'docs' ? 'docs/' : ''}${new Date().getFullYear()}/${crypto.randomUUID()}.pdf`; const { error } = await SB.storage.from('laudos-mp').upload(path, file, { contentType: 'application/pdf' }); if (error) throw { code: /size|large/i.test(error.message) ? 'too_large' : 'unavailable', message: error.message }; return { id: path, url: '' }; } } : null;
+  const assets = (admin || p.perfil === 'laboratorio' || p.perfil === 'qualidade') ? { async upload(file, opts = {}) { const path = `${opts.pasta === 'docs' ? 'docs/' : ''}${new Date().getFullYear()}/${crypto.randomUUID()}.pdf`; const { error } = await SB.storage.from('laudos-mp').upload(path, file, { contentType: 'application/pdf' }); if (error) throw { code: /size|large/i.test(error.message) ? 'too_large' : 'unavailable', message: error.message }; return { id: path, url: '' }; } } : null;
   const caps = { db, user, downloads, assets };
   return { use: async (n) => caps[n] || null };
 }
