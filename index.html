@@ -441,6 +441,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
           <div class="hd"><span class="label">Dados do laudo</span><div class="row" style="gap:6px"><button type="button" class="btn small" id="lOutro" hidden title="Cria um laudo novo do mesmo lote, com os mesmos ensaios, para outro cliente">Novo laudo para outro cliente</button><button type="button" class="btn small" id="lNovo" hidden>Limpar</button></div></div>
           <div class="bd" style="display:flex;flex-direction:column;gap:14px">
             <div id="lSel" class="lwarn pend">Nenhum laudo aberto.</div>
+            <div id="lDocs" class="src" style="font-size:13px;margin-top:6px"></div>
             <div class="field"><label for="lCliente">Nome do cliente</label><input type="text" id="lCliente" list="dlClientes" autocomplete="off" placeholder="Ex.: ETERNIT S.A."></div>
             <div class="lgrid">
               <div class="field"><label for="lNF">Nota fiscal</label><input type="text" id="lNF" class="mono"></div>
@@ -485,7 +486,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
   <section class="view" id="v-esp" hidden>
     <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px">
       <div><div class="label" id="espCode">ESP</div><div style="font-family:var(--f-display);font-weight:700;font-size:28px;line-height:1.1">Revisão <span class="mono" id="espRev">—</span></div><div class="src" id="espData"></div></div>
-      <div class="row" style="gap:8px"><button class="btn small" type="button" id="espDef" hidden>Definir número atual</button><button class="btn small" type="button" data-espass="atual">Lista de assinatura</button><button class="btn small primary" type="button" data-espxls>Gerar Excel da ESP</button></div>
+      <div class="row" style="gap:8px"><button class="btn small" type="button" id="espDef" hidden>Definir número atual</button><button class="btn small" type="button" data-espass="atual">Lista de assinatura</button><button class="btn small" type="button" id="espResp" hidden>Elaborador / aprovador</button><button class="btn small" type="button" data-espxls>Excel</button><button class="btn small primary" type="button" data-esppdf>Gerar ESP (PDF)</button></div>
     </div>
     <div class="toolbar"><div class="field grow"><label for="espBusca">Buscar item ou detalhe</label><input type="search" id="espBusca"></div>
       <div class="field"><label for="espTipo">Modificação</label><select id="espTipo"><option value="">Todas</option><option value="rev">Só as que mudam a revisão</option><option value="inclusao">Inclusões</option><option value="exclusao">Exclusões</option><option value="alteracao">Alterações de limites</option></select></div></div>
@@ -511,6 +512,14 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
     <div class="field"><label for="exMotivo">Motivo da revisão da ESP</label><textarea id="exMotivo" placeholder="Ex.: produto descontinuado; cadastro duplicado"></textarea></div>
     <div class="err" id="exErr" hidden></div>
     <div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn danger" id="exGo">Excluir definitivamente</button></div>
+  </div></form></dialog>
+
+<dialog id="dEspResp"><form id="erForm" novalidate>
+  <div class="hd"><div><div class="label" id="erSub"></div><h2 style="font-size:22px">Elaborador e aprovador da ESP</h2></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
+  <div class="bd" style="display:flex;flex-direction:column;gap:12px">
+    <div class="lgrid" style="grid-template-columns:1fr 1fr"><div class="field"><label for="erElab">Elaborador</label><input type="text" id="erElab" placeholder="Ex.: Marco A. Nunes Moretto"></div><div class="field"><label for="erAprov">Aprovador</label><input type="text" id="erAprov" placeholder="Ex.: Arthur Mariani"></div></div>
+    <div class="err" id="erErr" hidden></div>
+    <div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn primary">Salvar</button></div>
   </div></form></dialog>
 
 <dialog id="dEsp"><form id="espForm" novalidate>
@@ -540,8 +549,11 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       <div class="field grow"><label for="pBusca" id="lPBusca">Buscar</label><input type="search" id="pBusca"></div>
       <div class="field"><label for="pFiltro">Mostrar</label><select id="pFiltro"><option value="">Todos</option><option value="ativo">Ativos</option><option value="semspec">Sem nenhum limite</option><option value="inativo">Inativos</option></select></div>
       <button class="btn" id="pImport" type="button" hidden>Importar pasta de laudos</button>
+      <button class="btn" type="button" data-docimp="it" hidden>Importar Inf. técnico</button>
+      <button class="btn" type="button" data-docimp="fds" hidden>Importar FDS</button>
+      <input type="file" id="fDocs" multiple accept=".pdf,application/pdf" class="sr">
       <input type="file" id="fPasta" webkitdirectory directory multiple class="sr">
-      <button class="btn" type="button" data-espxls>Excel da ESP</button>
+      <button class="btn" type="button" data-esppdf>ESP (PDF)</button>
       <button class="btn" id="pNovo" type="button">Novo</button>
     </div>
     <div class="tablebox"><table class="grid" style="min-width:900px"><thead id="pHead"></thead><tbody id="pBody"></tbody></table></div>
@@ -553,6 +565,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
 <datalist id="dlAnalistas"></datalist>
 <datalist id="dlAux"></datalist>
 <datalist id="dlClientes"></datalist>
+<datalist id="dlSpindle"><option value="1"><option value="2"><option value="3"><option value="4"><option value="5"><option value="6"><option value="7"><option value="LV-1"><option value="LV-2"><option value="LV-3"><option value="LV-4"></datalist>
 <datalist id="dlCopo"><option value="CF 2"><option value="CF 3"><option value="CF 4"><option value="CF 5"><option value="CF 6"><option value="CF 8"></datalist>
 
 <dialog id="dAcessos"><div class="hd"><div><h2 style="font-size:22px">Usuários do app</h2><p class="src" style="margin:4px 0 0">Administrador e Laboratório usam o app inteiro. Faturamento vê só os laudos do produto acabado. Qualidade consulta as especificações dos três módulos e as revisões da ESP. Só o Administrador altera especificações.</p></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
@@ -615,6 +628,19 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
 <dialog id="dPdf" style="width:min(980px,calc(100vw - 16px))"><div class="hd"><div style="min-width:0"><div class="label">Laudo</div><h2 id="pdfTitle" style="font-size:18px;overflow-wrap:anywhere"></h2></div><div style="display:flex;gap:8px;align-items:start"><button class="btn small" type="button" id="pdfSave">Baixar</button><button class="x" type="button" data-close aria-label="Fechar">×</button></div></div>
   <div class="bd"><div id="pdfMsg" class="src" style="margin-bottom:8px"></div><div id="pdfPages" style="max-height:calc(100vh - 170px);overflow:auto;background:var(--soft);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:8px;align-items:center"></div></div></dialog>
 
+<dialog id="dDocImp" style="width:min(900px,calc(100vw - 16px))"><div class="hd"><div><div class="label">Produto acabado</div><h2 style="font-size:22px" id="diTitle">Importar documentos</h2></div><button class="x" type="button" data-close aria-label="Fechar" id="diClose">×</button></div>
+  <div class="bd" style="display:flex;flex-direction:column;gap:10px">
+    <div id="diInfo" style="font-size:13px"></div>
+    <div style="overflow:auto;max-height:52vh"><table class="acc" style="font-size:13px"><thead><tr><th>Arquivo</th><th>Produto</th><th>Data</th></tr></thead><tbody id="diBody"></tbody></table></div>
+    <datalist id="dlDocProd"></datalist>
+    <div id="diProg" hidden><div style="height:8px;background:var(--soft);border-radius:4px;overflow:hidden"><div id="diBar" style="height:100%;width:0;background:var(--accent)"></div></div><div class="src" id="diTxt" style="margin-top:6px"></div></div>
+    <div class="err" id="diErr" hidden></div>
+    <div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-close>Cancelar</button><button type="button" class="btn primary" id="diGo">Enviar</button></div>
+  </div></dialog>
+
+<dialog id="dDocs"><div class="hd"><div><div class="label" id="ddSub"></div><h2 style="font-size:22px" id="ddTitle"></h2></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
+  <div class="bd"><div style="overflow-x:auto;max-height:60vh"><table class="acc"><thead><tr><th>Data</th><th>Arquivo</th><th>Enviado em</th></tr></thead><tbody id="ddBody"></tbody></table></div></div></dialog>
+
 <dialog id="dImport"><div class="hd"><div><div class="label">Matéria-prima</div><h2 style="font-size:22px">Importar pasta de laudos</h2></div><button class="x" type="button" data-close aria-label="Fechar" id="impClose">×</button></div>
   <div class="bd" style="display:flex;flex-direction:column;gap:12px">
     <div id="impPlan" style="font-size:13px"></div>
@@ -632,6 +658,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
     <div class="extras-head"><span class="label">Outras especificações</span><button type="button" class="btn small" id="addExtra">+ Adicionar especificação</button></div>
     <div id="extrasList"></div>
     <p class="src">Deixe mínimo e máximo em branco quando o parâmetro não se aplica (N/A).</p>
+    <div id="specDocs" hidden style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px"></div>
     <div class="field" style="margin-top:12px"><label for="sMotivo">Motivo da revisão da ESP</label><input type="text" id="sMotivo" placeholder="Ex.: produto novo solicitado pelo comercial; item descontinuado"><div class="src" style="font-size:12px;margin-top:3px">Obrigatório ao incluir, inativar ou reativar um item (essas mudanças sobem a revisão). Opcional em alterações de limites.</div></div>
     <div class="err" id="specErr" hidden></div>
     <div class="row" style="margin-top:12px;justify-content:flex-end"><button type="button" class="btn danger" id="specDel" style="margin-right:auto" hidden>Excluir item</button><button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn primary" id="specSave">Salvar especificação</button></div>
@@ -673,7 +700,7 @@ const MODS = {
       { k: 'colagem', nome: 'Colagem', short: 'Colagem', tipo: 'aprov', txt: 'colagem', hint: 'Teste de aplicação' },
       { k: 'aparencia', nome: 'Aparência', short: 'Aparência', unit: 'visual', tipo: 'aprov', txt: 'visual', def: 'OK', req: true }],
     specText: [{ k: 'visual', label: 'Aparência esperada', full: true, ph: 'Ex.: Líquido leitoso' }, { k: 'colagem', label: 'Teste de colagem' }, { k: 'umidade', label: 'Umidade' }],
-    laudo: false, codigo: false, csv: 'FR002',
+    laudo: false, codigo: false, csv: 'FR002', docs: true,
   },
   pi: {
     key: 'pi', code: 'FR 011 · Rev01', title: 'Liberação de Produto Intermediário', item: 'Produto intermediário', itemCol: 'Intermediário', itemPl: 'intermediários', novo: 'Novo intermediário',
@@ -778,8 +805,13 @@ function specOf(rec, mod = M) {
   const p = D[mod.key].itens.get(slug(normNome(rec?.produto)));
   return p ? specSnap(p, mod) : null;
 }
+const isBrook = (p) => (p && p.viscTipo) === 'brookfield';
+const viscUnit = (p) => isBrook(p) ? 'cP' : 's';
+const unitOf = (f, p) => f.k === 'visc' && f.unit ? viscUnit(p) : f.unit;
+function viscMetodo(p) { if (!p) return ''; if (isBrook(p)) return ['Brookfield', p.viscSpindle ? 'spindle ' + p.viscSpindle : '', p.viscRpm ? p.viscRpm + ' rpm' : '', p.viscTemp ? p.viscTemp + ' °C' : ''].filter(Boolean).join(' · '); return p.viscCopo || ''; }
 function specSnap(p, mod = M) {
   const o = { extras: p.extras || [] };
+  if (p.viscTipo) { o.viscTipo = p.viscTipo; o.viscCopo = p.viscCopo || null; }
   mod.fields.filter(f => f.tipo === 'faixa').forEach(f => { o[f.mn] = p[f.mn] ?? null; o[f.mx] = p[f.mx] ?? null; });
   return o;
 }
@@ -893,11 +925,12 @@ function refreshForm() {
   else if (!p) { info.className = 'prodinfo nospec'; info.textContent = st().loaded ? 'Sem especificação cadastrada. Os resultados serão gravados sem verificação de limites.' : 'Carregando especificações…'; }
   else {
     info.className = 'prodinfo';
-    info.innerHTML = (p.codigo ? `<span>Código <b>${esc(p.codigo)}</b></span>` : '') + `<span>Aparência esperada: <b>${esc(p.visual || '—')}</b></span>` + (p.odor ? `<span>Odor: <b>${esc(p.odor)}</b></span>` : '') + (p.viscCopo ? `<span>Viscosidade em <b>${esc(p.viscCopo)}</b></span>` : '') + (p.ativo === false ? '<span class="err">Marcado como inativo</span>' : '');
+    info.innerHTML = (p.codigo ? `<span>Código <b>${esc(p.codigo)}</b></span>` : '') + `<span>Aparência esperada: <b>${esc(p.visual || '—')}</b></span>` + (p.odor ? `<span>Odor: <b>${esc(p.odor)}</b></span>` : '') + (p.viscCopo ? `<span>Viscosidade em <b>${esc(p.viscCopo)}</b>${isBrook(p) ? ' (cP)' : ''}</span>` : '') + (p.ativo === false ? '<span class="err">Marcado como inativo</span>' : '');
   }
   const xkey = p ? M.key + slug(p.nome) + JSON.stringify(p.extras || []) : M.key;
   if (xkey !== S.extrasKey) { buildExtraRows(p); S.extrasKey = xkey; }
   const sp = p || {};
+  const uv = document.querySelector('tr[data-p="visc"] .unit'); if (uv) uv.textContent = viscUnit(p);
   const rec = formRec(); const ev = evalRec(rec);
   M.fields.forEach(f => {
     let s = '';
@@ -1045,8 +1078,8 @@ $('rSit').addEventListener('change', () => renderRegistros());
 function renderHeads() {
   $('rHead').innerHTML = '<tr><th>Data</th><th>' + esc(M.itemCol) + '</th><th>Lote</th>' + (M.aux.col ? `<th>${esc(M.aux.label)}</th>` : '') + (M.validade ? '<th>Validade</th>' : '')
     + M.fields.map(f => `<th>${esc(f.short)}</th>`).join('') + '<th>Outros ensaios</th><th>Situação</th><th>RNC</th><th>Analista</th>' + (M.laudo ? '<th>Laudo</th>' : '') + '<th>Observação</th></tr>';
-  $('pHead').innerHTML = '<tr><th>' + esc(M.itemCol) + '</th>' + M.fields.filter(f => f.tipo === 'faixa').map(f => `<th>${esc(f.nome)}${f.unit ? ` (${esc(f.unit)})` : ''}</th>`).join('')
-    + M.specText.map(t => `<th>${esc(t.label.replace(' esperada', ''))}</th>`).join('') + '<th>Outras especificações</th>' + (M.laudo ? '<th>Laudos</th>' : '') + '<th>Situação</th></tr>';
+  $('pHead').innerHTML = '<tr><th>' + esc(M.itemCol) + '</th>' + M.fields.filter(f => f.tipo === 'faixa').map(f => `<th>${esc(f.nome)}${f.unit ? ` (${esc(f.k === 'visc' ? 's ou cP' : f.unit)})` : ''}</th>`).join('')
+    + M.specText.map(t => `<th>${esc(t.label.replace(' esperada', ''))}</th>`).join('') + '<th>Outras especificações</th>' + (M.laudo ? '<th>Laudos</th>' : '') + (M.docs ? '<th>Inf. técnico / FDS</th>' : '') + '<th>Situação</th></tr>';
 }
 const nCols = () => 3 + (M.aux.col ? 1 : 0) + (M.validade ? 1 : 0) + M.fields.length + 4 + (M.laudo ? 1 : 0) + 1;
 
@@ -1126,7 +1159,8 @@ function openRec(r) {
   const ev = evalRec(r), sp = specOf(r) || {};
   $('dRecSub').textContent = `${dataBR(r.data)} · Lote ${r.lote}`;
   $('dRecTitle').textContent = r.produto;
-  const line = (f) => `<dt>${esc(f.nome)}</dt><dd><span class="num">${shown(r[f.k])}</span>${f.unit && f.tipo !== 'aprov' ? ' ' + esc(f.unit) : ''} ${f.tipo === 'faixa' ? `<span class="src">(${fmt(sp[f.mn])} – ${fmt(sp[f.mx])})</span> ` : ''}${chip(ev[f.k] === 'free' || ev[f.k] === 'na' ? null : ev[f.k])}</dd>`;
+  const itv = st().itens.get(slug(normNome(r.produto))); const spv = sp.viscTipo ? sp : itv;
+  const line = (f) => `<dt>${esc(f.nome)}</dt><dd><span class="num">${shown(r[f.k])}</span>${f.unit && f.tipo !== 'aprov' ? ' ' + esc(unitOf(f, spv)) : ''} ${f.tipo === 'faixa' ? `<span class="src">(${fmt(sp[f.mn])} – ${fmt(sp[f.mx])})</span> ` : ''}${chip(ev[f.k] === 'free' || ev[f.k] === 'na' ? null : ev[f.k])}</dd>`;
   const laudo = r.laudo?.id ? `<a href="/_blob/${esc(r.laudo.id)}" target="_blank" rel="noopener">${esc(r.laudo.nome || 'Abrir laudo')}</a>` : r.laudoRef ? (refArq(r.laudoRef) ? `<a href="/_blob/${esc(refArq(r.laudoRef).id)}" target="_blank" rel="noopener">${esc(refArq(r.laudoRef).nome)}</a>` : `<span class="src">Arquivo na rede da empresa (planilha antiga): ${esc(r.laudoRef)}</span>`) : '—';
   $('dRecKv').innerHTML = `<dt>Situação</dt><dd><span class="sit ${esc(r.situacao)}">${esc(r.situacao || '—')}</span></dd>`
     + (r[M.aux.k] ? `<dt>${esc(M.aux.label)}</dt><dd>${esc(r[M.aux.k])}</dd>` : '')
@@ -1181,16 +1215,17 @@ function renderSpecs() {
     return true;
   }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt', { numeric: true }));
   const rg = (a, b) => (a == null || b == null) ? '<span class="src">N/A</span>' : `${fmt(a)} – ${fmt(b)}`;
-  const nc = 1 + faixas.length + M.specText.length + 2 + (M.laudo ? 1 : 0);
+  const nc = 1 + faixas.length + M.specText.length + 2 + (M.laudo ? 1 : 0) + (M.docs ? 1 : 0);
   $('pBody').innerHTML = !d.loaded ? `<tr><td colspan="${nc}" class="empty">Carregando especificações…</td></tr>`
     : list.length ? list.map(p => `<tr data-id="${esc(p.id)}"><td>${esc(p.nome)}${p.codigo ? ` <span class="src">cód. ${esc(p.codigo)}</span>` : ''}</td>`
-      + faixas.map(x => `<td class="v">${rg(p[x.mn], p[x.mx])}${x.copo && p[x.copo] ? ` <span class="src">${esc(p[x.copo])}</span>` : ''}</td>`).join('')
+      + faixas.map(x => `<td class="v">${rg(p[x.mn], p[x.mx])}${x.copo && p[x.copo] ? ` <span class="src">${esc(p[x.copo])}${x.k === 'visc' && isBrook(p) ? ' (cP)' : ''}</span>` : ''}</td>`).join('')
       + M.specText.map(t => `<td>${esc(p[t.k] || '—')}</td>`).join('')
-      + `<td class="xspec">${(p.extras || []).map(e => `<div>${esc(e.nome)}: ${extraRange(e)}</div>`).join('') || '—'}</td>${M.laudo ? `<td>${laudosDe(p.nome).length ? `<button type="button" class="btn small" data-laudosmp="${esc(p.nome)}">${laudosDe(p.nome).length} PDFs</button>` : '<span class="src">—</span>'}</td>` : ''}<td><div class="row" style="gap:6px;flex-wrap:nowrap">${p.ativo === false ? '<span class="chip na">Inativo</span>' : '<span class="chip ok">Ativo</span>'}${podeEsp() ? '<button type="button" class="btn small danger" data-delspec title="Excluir item">Excluir</button>' : ''}</div></td></tr>`).join('')
+      + `<td class="xspec">${(p.extras || []).map(e => `<div>${esc(e.nome)}: ${extraRange(e)}</div>`).join('') || '—'}</td>${M.laudo ? `<td>${laudosDe(p.nome).length ? `<button type="button" class="btn small" data-laudosmp="${esc(p.nome)}">${laudosDe(p.nome).length} PDFs</button>` : '<span class="src">—</span>'}</td>` : ''}${M.docs ? `<td>${docsCell(p)}</td>` : ''}<td><div class="row" style="gap:6px;flex-wrap:nowrap">${p.ativo === false ? '<span class="chip na">Inativo</span>' : '<span class="chip ok">Ativo</span>'}${podeEsp() ? '<button type="button" class="btn small danger" data-delspec title="Excluir item">Excluir</button>' : ''}</div></td></tr>`).join('')
     : `<tr><td colspan="${nc}" class="empty">${d.itens.size ? 'Nenhum item com esse filtro.' : `Nenhuma especificação cadastrada. Use ${esc(M.novo)} para incluir a primeira.`}</td></tr>`;
   $('pCount').textContent = `${list.length} de ${d.itens.size} ${M.itemPl}`;
   $('pPerm').textContent = podeEsp() ? 'Clique em uma linha para editar.' : 'Somente o administrador altera especificações.';
   $('pNovo').hidden = !podeEsp(); $('pImport').hidden = !(M.laudo && podeEsp() && S.assets);
+  document.querySelectorAll('[data-docimp]').forEach(b => b.hidden = !(M.docs && podeEsp() && S.assets));
 }
 $('pBusca').addEventListener('input', renderSpecs);
 $('pFiltro').addEventListener('change', renderSpecs);
@@ -1209,15 +1244,19 @@ function openSpec(id) {
   h += `<div class="field"><label for="sAtivo">Situação</label><select id="sAtivo"><option value="1">Ativo</option><option value="0"${p.ativo === false ? ' selected' : ''}>Inativo</option></select></div>`;
   if (!M.codigo) h += '<div></div>';
   M.fields.filter(f => f.tipo === 'faixa').forEach(f => {
-    const u = f.unit ? ` (${f.unit})` : '';
-    h += `<div class="field"><label for="s_${f.mn}">${esc(f.nome)} mínima${esc(u)}</label><input type="text" id="s_${f.mn}" class="mono" inputmode="decimal" value="${v(p[f.mn])}"></div>`
-      + `<div class="field"><label for="s_${f.mx}">${esc(f.nome)} máxima${esc(u)}</label><input type="text" id="s_${f.mx}" class="mono" inputmode="decimal" value="${v(p[f.mx])}"></div>`;
-    if (f.copo) h += `<div class="field full"><label for="s_${f.copo}">Método da viscosidade</label><input type="text" id="s_${f.copo}" list="dlCopo" placeholder="Ex.: CF 4" value="${esc(p[f.copo] || '')}"></div>`;
+    const u = f.unit ? ` (${f.k === 'visc' ? `<span data-vu>${viscUnit(p)}</span>` : f.unit})` : '';
+    h += `<div class="field"><label for="s_${f.mn}">${esc(f.nome)} mínima${u}</label><input type="text" id="s_${f.mn}" class="mono" inputmode="decimal" value="${v(p[f.mn])}"></div>`
+      + `<div class="field"><label for="s_${f.mx}">${esc(f.nome)} máxima${u}</label><input type="text" id="s_${f.mx}" class="mono" inputmode="decimal" value="${v(p[f.mx])}"></div>`;
+    if (f.copo) h += `<div class="field"><label for="sViscTipo">Ensaio de viscosidade</label><select id="sViscTipo"><option value="copo">Copo Ford (segundos)</option><option value="brookfield"${isBrook(p) ? ' selected' : ''}>Brookfield (cP)</option></select></div>`
+      + `<div class="field" data-vt="copo"${isBrook(p) ? ' hidden' : ''}><label for="s_${f.copo}">Copo</label><input type="text" id="s_${f.copo}" list="dlCopo" placeholder="Ex.: CF 4" value="${esc(isBrook(p) ? '' : (p[f.copo] || ''))}"></div>`
+      + `<div class="field" data-vt="brookfield"${isBrook(p) ? '' : ' hidden'}><label for="sViscSp">Spindle</label><input type="text" id="sViscSp" list="dlSpindle" placeholder="Ex.: 3 ou LV-2" value="${esc(p.viscSpindle || '')}"></div>`
+      + `<div class="field" data-vt="brookfield"${isBrook(p) ? '' : ' hidden'}><label for="sViscRpm">Rotação (rpm)</label><input type="text" id="sViscRpm" class="mono" inputmode="decimal" placeholder="Ex.: 20" value="${esc(p.viscRpm || '')}"></div>`
+      + `<div class="field" data-vt="brookfield"${isBrook(p) ? '' : ' hidden'}><label for="sViscTemp">Temperatura (°C)</label><input type="text" id="sViscTemp" class="mono" inputmode="decimal" placeholder="Ex.: 25" value="${esc(p.viscTemp || '')}"></div>`;
   });
   M.specText.forEach(t => { h += `<div class="field${t.full ? ' full' : ''}"><label for="st_${t.k}">${esc(t.label)}</label><input type="text" id="st_${t.k}" placeholder="${esc(t.ph || '')}" value="${esc(p[t.k] || '')}"></div>`; });
   $('specFields').innerHTML = h;
   $('extrasList').innerHTML = ''; (p.extras || []).forEach(addExtraRow); extrasEmptyState();
-  $('specErr').hidden = true; $('dSpec').showModal();
+  $('specErr').hidden = true; renderSpecDocs(); $('dSpec').showModal();
 }
 function extrasEmptyState() {
   const has = $('extrasList').querySelector('.xrow');
@@ -1241,6 +1280,11 @@ function addExtraRow(e) {
   $('extrasList').appendChild(row); extrasEmptyState();
   return row;
 }
+$('specFields').addEventListener('change', (e) => {
+  if (e.target.id !== 'sViscTipo') return; const t = e.target.value;
+  document.querySelectorAll('#specFields [data-vt]').forEach(el => el.hidden = el.dataset.vt !== t);
+  document.querySelectorAll('#specFields [data-vu]').forEach(el => el.textContent = t === 'brookfield' ? 'cP' : 's');
+});
 $('addExtra').addEventListener('click', () => addExtraRow().querySelector('.xn').focus());
 function readExtraSpecs() {
   const out = [], ids = new Set();
@@ -1273,7 +1317,12 @@ $('specForm').addEventListener('submit', async (e) => {
       const x = parseNum($('s_' + f.mn).value), y = parseNum($('s_' + f.mx).value);
       if ((x == null) !== (y == null)) throw `${f.nome}: preencha mínimo e máximo, ou deixe os dois em branco.`;
       if (x != null && x > y) throw `${f.nome}: o mínimo é maior que o máximo.`;
-      doc[f.mn] = x; doc[f.mx] = y; if (f.copo) doc[f.copo] = $('s_' + f.copo).value.trim() || null;
+      doc[f.mn] = x; doc[f.mx] = y;
+      if (f.copo) {
+        const tipo = $('sViscTipo') ? $('sViscTipo').value : 'copo';
+        if (tipo === 'brookfield') { doc.viscTipo = 'brookfield'; doc.viscSpindle = $('sViscSp').value.trim() || null; doc.viscRpm = $('sViscRpm').value.trim() || null; doc.viscTemp = $('sViscTemp').value.trim() || null; doc[f.copo] = viscMetodo(doc); }
+        else { doc.viscTipo = 'copo'; delete doc.viscSpindle; delete doc.viscRpm; delete doc.viscTemp; doc[f.copo] = $('s_' + f.copo).value.trim() || null; }
+      }
     });
     doc.extras = readExtraSpecs();
   } catch (m) { return err(m); }
@@ -1347,7 +1396,7 @@ function fillDatalists() {
 }
 async function startModule(key) {
   const d = D[key], mod = MODS[key];
-  if (d.started || !S.db) return; d.started = true; startEsp(); startFrRev();
+  if (d.started || !S.db) return; d.started = true; startEsp(); startFrRev(); startDocs(); startEspResp();
   S.db.collection(mod.col.itens).onSnapshot((snap) => {
     d.itens = new Map(snap.docs.map(x => [x.id, x.data()])); d.loaded = true;
     if (key === M.key) { S.extrasKey = null; fillDatalists(); refreshForm(); renderSpecs(); if (!$('v-registros').hidden) renderRegistros(); renderToday(); }
@@ -1376,7 +1425,7 @@ function diffSpec(o, n) {
   const out = [];
   M.fields.filter(f => f.tipo === 'faixa').forEach(f => {
     if ((o[f.mn] ?? null) !== (n[f.mn] ?? null) || (o[f.mx] ?? null) !== (n[f.mx] ?? null)) out.push(`${f.nome}: ${espFx(o[f.mn], o[f.mx])} → ${espFx(n[f.mn], n[f.mx])}`);
-    if (f.copo && (o[f.copo] || '') !== (n[f.copo] || '')) out.push(`${f.nome} copo: ${o[f.copo] || '—'} → ${n[f.copo] || '—'}`);
+    if (f.copo && (o[f.copo] || '') !== (n[f.copo] || '')) out.push(`${f.nome} método: ${o[f.copo] || '—'} → ${n[f.copo] || '—'}`);
   });
   M.specText.forEach(t => { if ((o[t.k] || '') !== (n[t.k] || '')) out.push(`${t.label}: ${o[t.k] || '—'} → ${n[t.k] || '—'}`); });
   if (M.codigo && (o.codigo || '') !== (n.codigo || '')) out.push(`Código: ${o.codigo || '—'} → ${n.codigo || '—'}`);
@@ -1401,7 +1450,7 @@ function renderEsp() {
   $('espCode').textContent = `ESP · ${M.item} · ${frOf(M)}`;
   $('espRev').textContent = cur ? String(cur.rev).padStart(2, '0') : '—';
   $('espData').textContent = cur ? `Atualizada em ${dataBR(cur.data)}` : (ESP.loaded ? 'Nenhuma revisão registrada. Defina o número atual da ESP para começar.' : 'Carregando…');
-  $('espDef').hidden = !podeEsp();
+  $('espDef').hidden = !podeEsp(); $('espResp').hidden = !podeEsp();
   const q = $('espBusca').value.trim().toUpperCase(), ft = $('espTipo').value;
   const l = espDe(M.key).filter(x => !ft || (ft === 'rev' ? x.tipo !== 'alteracao' : ft === 'exclusao' ? x.tipo === 'exclusao' : ft === 'inclusao' ? (x.tipo === 'inclusao' || x.tipo === 'reinclusao') : x.tipo === ft))
     .filter(x => !q || `${x.item} ${x.detalhe} ${x.motivo || ''}`.toUpperCase().includes(q));
@@ -1443,7 +1492,7 @@ async function gerarExcelEsp() {
   const cur = espAtual(M.key), rv = cur ? String(cur.rev).padStart(2, '0') : '—';
   const faixas = M.fields.filter(f => f.tipo === 'faixa');
   const head = ['Item']; if (M.codigo) head.push('Código');
-  faixas.forEach(f => { const u = f.unit ? ` (${f.unit})` : ''; head.push(`${f.nome} mín.${u}`, `${f.nome} máx.${u}`); if (f.copo) head.push(`${f.nome} copo`); });
+  faixas.forEach(f => { const u = f.unit ? ` (${f.k === 'visc' ? 's ou cP' : f.unit})` : ''; head.push(`${f.nome} mín.${u}`, `${f.nome} máx.${u}`); if (f.copo) head.push(`${f.nome} método`); });
   M.specText.forEach(t => head.push(t.label)); head.push('Especificações adicionais');
   const itens = [...d.itens.values()].filter(p => p.ativo !== false).sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
   const num = (v) => v == null || v === '' ? '' : v;
@@ -1501,55 +1550,198 @@ $('frForm').addEventListener('submit', async (e) => {
 });
 function startFrRev() { if (FRREV.started || !S.db) return; FRREV.started = true; S.db.doc('config/frrev').get().then(sn => { if (sn.exists) { FRREV.cfg = sn.data() || {}; frAplicar(); } }).catch(() => {}); }
 
-/* ---------- lista de assinatura (ciência de revisão) ---------- */
+/* ---------- FR 015 · Lista de presença em treinamento (ciência de revisão) ---------- */
 function pdfAssinatura(I0) {
   const dot = (v) => typeof v === 'string' ? v.replace(/ · /g, ' - ').replace(/·/g, '-') : v;
   const I = { ...I0, documento: dot(I0.documento), motivo: dot(I0.motivo), por: dot(I0.por), mudancas: (I0.mudancas || []).map(dot) };
   const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const X0 = 18, W = 174;
+  const X = 12, W = 186, R = X + W; doc.setDrawColor(0); doc.setTextColor(0); doc.setLineWidth(0.25);
   const nomes = (ACC.lista || []).filter(u => u.ativo !== false && u.nome).map(u => ({ nome: u.nome, funcao: PERFIS[u.perfil] || '' })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
-  const cab = (first) => {
-    doc.addImage(LOGO, 'JPEG', X0, 10, 34, 19);
-    doc.setFont('helvetica', 'bold'); doc.setTextColor(17, 17, 17); doc.setFontSize(14);
-    doc.text('LISTA DE CIÊNCIA DE REVISÃO', X0 + W, 18, { align: 'right' });
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text('Registro de leitura e treinamento dos colaboradores', X0 + W, 23.5, { align: 'right' });
-    doc.setLineWidth(0.4); doc.line(X0, 32, X0 + W, 32);
-    if (!first) { doc.setFontSize(9); doc.text(`${I.documento} · Rev${I.rev} (continuação)`, X0, 38); return 44; }
-    let y = 39; doc.setFontSize(9.5);
-    const lin = (k, v) => { doc.setFont('helvetica', 'bold'); doc.text(k, X0, y); doc.setFont('helvetica', 'normal'); const t = doc.splitTextToSize(String(v || '-'), W - 38); doc.text(t, X0 + 38, y); y += t.length * 4.6 + 1; };
-    lin('Documento:', I.documento); lin('Revisão:', `Rev${I.rev}${I.anterior != null ? `  (anterior: Rev${I.anterior})` : ''}`); lin('Data da revisão:', dataBR(I.data)); lin('Responsável:', I.por); lin('Motivo:', I.motivo);
-    if (I.mudancas?.length) {
-      doc.setFont('helvetica', 'bold'); doc.text('Alterações:', X0, y); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-      const max = 14; let n = 0;
-      for (const m of I.mudancas) { if (n >= max) break; const t = doc.splitTextToSize('• ' + m, W - 38); const t2 = t.slice(0, Math.max(1, max - n)); doc.text(t2, X0 + 38, y); y += t2.length * 4; n += t2.length; }
-      if (I.mudancas.length && n >= max) { doc.text(`(lista completa na aba Revisões ESP do app)`, X0 + 38, y); y += 4; }
-      doc.setFontSize(9.5); y += 1;
-    }
-    y += 2; doc.setFont('helvetica', 'italic'); doc.setFontSize(9);
-    const dec = doc.splitTextToSize('Declaro que li e compreendi a revisão do documento acima e que estou ciente das alterações.', W); doc.text(dec, X0, y); y += dec.length * 4.4 + 3;
-    doc.setFont('helvetica', 'normal'); return y;
+  const page = (first) => {
+    // cabeçalho
+    doc.rect(X, 8, W, 17); doc.line(X + 58, 8, X + 58, 25);
+    doc.addImage(LOGO, 'JPEG', X + 10, 9.5, 25, 14);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('LISTA DE PRESENÇA EM TREINAMENTO', X + 58 + (W - 58) / 2, 18, { align: 'center' });
+    let y = 27; doc.setFontSize(8);
+    // bloco de dados
+    const L = X + 128; // divisória coluna direita
+    const lab = (t, x, yy) => { doc.setFont('helvetica', 'normal'); doc.text(t, x + 1, yy + 3.2); };
+    doc.rect(X, y, W, 64);
+    doc.line(L, y, L, y + 64);
+    // linha 1: treinamento (alto) | data / horário
+    doc.line(X, y + 26, R, y + 26); doc.line(L + 29, y, L + 29, y + 13); doc.line(L, y + 13, R, y + 13);
+    lab('Treinamento:', X, y); lab('Data:', L, y); lab('Horário:', L + 29, y);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+    const tt = doc.splitTextToSize(`Leitura e ciência da revisão: ${I.documento} - Rev${I.rev}${I.anterior != null ? ` (anterior: Rev${I.anterior})` : ''}`, 112); doc.text(tt.slice(0, 2), X + 1, y + 7.5);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.2);
+    let ty = y + 7.5 + Math.min(tt.length, 2) * 3.6;
+    if (I.motivo) { const m = doc.splitTextToSize('Motivo: ' + I.motivo, 112).slice(0, 2); doc.text(m, X + 1, ty); ty += m.length * 3; }
+    if (I.mudancas?.length) { const a = doc.splitTextToSize('Alterações: ' + I.mudancas.join('; '), 112); const k = Math.max(1, Math.floor((y + 25 - ty) / 3)); doc.text(a.slice(0, k), X + 1, ty); if (a.length > k) doc.text('(ver documento)', X + 113, y + 24.5, { align: 'right' }); }
+    doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.text(I.data ? dataBR(I.data) : '', L + 1, y + 9);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); lab('Período Realização:', L, y + 13);
+    // tipo
+    doc.line(X, y + 33, L, y + 33); lab('Tipo:', X, y + 27);
+    const box = (x, t, on) => { doc.rect(x, y + 27.6, 4.5, 3.6); if (on) { doc.setFont('helvetica', 'bold'); doc.text('X', x + 1.1, y + 30.6); doc.setFont('helvetica', 'normal'); } doc.text(t, x + 5.5, y + 30.6); };
+    box(X + 10, 'INTERNO', true); box(X + 38, 'IN COMPANY', false); box(X + 74, 'IN JOB (No trabalho)', false);
+    // instrutores e coluna direita
+    lab('Instrutor(es):', X, y + 33); doc.text('1. ' + (I.por || ''), X + 1, y + 41);
+    doc.line(X, y + 44, L, y + 44); doc.text('2.', X + 1, y + 49); doc.line(X, y + 54, L, y + 54); doc.text('3.', X + 1, y + 59);
+    doc.line(L, y + 33, R, y + 33); lab('Carga Horária:', L, y + 33); doc.line(L, y + 44, R, y + 44); lab('Setor:', L, y + 44); doc.line(L, y + 54, R, y + 54); lab('Entidade Ministrante:', L, y + 54);
+    doc.text('Quimicer', L + 1, y + 62);
+    return y + 67;
   };
-  const COL = [['Nº', 10], ['Nome do colaborador', 62], ['Função / setor', 36], ['Data', 22], ['Assinatura', 44]];
-  const head = (y) => { let x = X0; doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setFillColor(233, 237, 236); doc.rect(X0, y, W, 7, 'F'); COL.forEach(([t, w]) => { doc.rect(x, y, w, 7); doc.text(t, x + 1.8, y + 4.8); x += w; }); doc.setFont('helvetica', 'normal'); return y + 7; };
-  const RH = 9.5, total = Math.max(nomes.length + 6, 16);
-  let y = head(cab(true)), i = 0;
+  const COLW = [8, 52, 56, 70]; const head = (y) => { doc.setFillColor(204, 255, 255); doc.rect(X, y, W, 6, 'FD'); let x = X; doc.setFont('helvetica', 'bold'); doc.setFontSize(8); ['N°', 'Nome Colaborador', 'Cargo/ função', 'Assinatura'].forEach((t, i) => { doc.rect(x, y, COLW[i], 6); doc.text(t, x + COLW[i] / 2, y + 4.1, { align: 'center' }); x += COLW[i]; }); doc.setFont('helvetica', 'normal'); return y + 6; };
+  const foot = () => { doc.rect(X, 269, W, 11); doc.line(X + 90, 269, X + 90, 280); doc.setFontSize(8); doc.text('Assinatura do Instrutor:', X + 1, 272.5); doc.text('Assinatura do SP:', X + 91, 272.5); doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.text('FR 015 REVISÃO 01', X, 285); doc.setFont('helvetica', 'normal'); };
+  const RH = 6.6, total = Math.max(nomes.length + 4, 25);
+  let y = head(page(true)), i = 0;
   while (i < total) {
-    if (y + RH > 282) { doc.addPage(); y = head(cab(false)); }
-    let x = X0; const u = nomes[i]; doc.setFontSize(9);
-    COL.forEach(([t, w], c) => { doc.rect(x, y, w, RH); const v = c === 0 ? String(i + 1) : c === 1 ? (u?.nome || '') : c === 2 ? (u?.funcao || '') : ''; if (v) doc.text(doc.splitTextToSize(v, w - 3)[0], x + 1.8, y + 6); x += w; });
+    if (y + RH > 266) { foot(); doc.addPage(); y = head(page(false)); }
+    const u = nomes[i]; let x = X; doc.setFontSize(8);
+    COLW.forEach((w, c) => { doc.rect(x, y, w, RH); const v = c === 0 ? String(i + 1) : c === 1 ? (u?.nome || '') : c === 2 ? (u?.funcao || '') : ''; if (v) doc.text(doc.splitTextToSize(v, w - 2)[0], c === 0 ? x + w / 2 : x + 1.5, y + 4.6, c === 0 ? { align: 'center' } : undefined); x += w; });
     y += RH; i++;
   }
-  const np = doc.getNumberOfPages();
-  for (let k = 1; k <= np; k++) { doc.setPage(k); doc.setFontSize(7); doc.setTextColor(90, 100, 98); doc.text(`Gerado pelo app Liberação de Lotes Quimicer em ${dataBR(hoje())}${ACC.me?.nome ? ' por ' + ACC.me.nome : ''}`, X0, 290); doc.text(`Página ${k} de ${np}`, X0 + W, 290, { align: 'right' }); doc.setTextColor(17, 17, 17); }
+  foot();
   return doc.output('arraybuffer');
 }
 async function gerarListaAss(I) {
   if (!window.jspdf) { toast('O gerador de PDF não carregou. Recarregue a página.'); return; }
   if (!S.downloads) { toast('Download indisponível nesta visualização.'); return; }
   if (window.QC_CONFIG && typeof loadUsuarios === 'function' && S.perfil === 'admin' && !(ACC.lista || []).length) { try { await loadUsuarios(); } catch {} }
-  try { await S.downloads.save({ filename: `Lista_assinatura_${slug(I.documento).slice(0, 50)}_Rev${slug(String(I.rev))}.pdf`, data: pdfAssinatura(I) }); }
-  catch (x) { if (x?.code !== 'declined') toast('Não foi possível gerar a lista de assinatura.'); }
+  try { await S.downloads.save({ filename: `FR015_Lista_presenca_${slug(I.documento).slice(0, 50)}_Rev${slug(String(I.rev))}.pdf`, data: pdfAssinatura(I) }); }
+  catch (x) { if (x?.code !== 'declined') toast('Não foi possível gerar a lista de presença.'); }
 }
+
+/* ---------- ESP em PDF no modelo oficial (ESP 000 / 001 / 002) ---------- */
+const ESPDOC = {
+  pa: { cod: 'ESP 001', titulo: 'Especificação de Produto Acabado', obj: 'Este documento tem como objetivo definir os limites de especificação para os parâmetros de produto acabado.' },
+  mp: { cod: 'ESP 000', titulo: 'Caracteristicas Físicas de Matéria Prima Fornecedor', obj: 'Este documento tem como objetivo definir os limites de especificação de características físicas de matéria prima fornecedor.' },
+  pi: { cod: 'ESP 002', titulo: 'Caracteristicas Físicas de Produto Intermediário', obj: 'Este documento tem como objetivo definir os limites de especificação de características físicas de produto intermediário.' },
+};
+const ESPRESP = { cfg: {}, loaded: false };
+function espColunas(k) {
+  const na = (v) => v == null || v === '' ? 'n.a' : (typeof v === 'number' ? fmt(v) : String(v));
+  const txt = (v) => (v == null || String(v).trim() === '') ? 'n.a' : String(v);
+  const faixaOuTxt = (p, a, b, t) => p[t] ? String(p[t]) : (p[a] != null || p[b] != null) ? `${na(p[a])} a ${na(p[b])}` : 'n.a';
+  const testes = (p, extra) => { const l = [...extra.filter(Boolean), ...(p.extras || []).map(e => e.nome + (e.tipo === 'faixa' && (e.min != null || e.max != null) ? ` ${na(e.min)}-${na(e.max)}${e.unidade ? ' ' + e.unidade : ''}` : ''))]; return l.length ? l.join('; ') : 'n.a'; };
+  const equip = (p) => p.viscMin == null && p.viscMax == null ? '-' : isBrook(p) ? ('BF' + (p.viscSpindle ? ' ' + p.viscSpindle : '')) : (p.viscCopo || '-');
+  if (k === 'pa') return [
+    { g: 'PRODUTO', w: 200, al: 'left', v: p => p.nome },
+    { g: 'DENSIDADE (g/cm3)', s: 'Min.', w: 40, v: p => na(p.densMin) }, { g: 'DENSIDADE (g/cm3)', s: 'Max.', w: 40, v: p => na(p.densMax) },
+    { g: 'VISCOSIDADE (s) / BF (cP)', s: 'Equip.', w: 36, v: equip, cinza: true }, { g: 'VISCOSIDADE (s) / BF (cP)', s: 'Min.', w: 40, v: p => na(p.viscMin) }, { g: 'VISCOSIDADE (s) / BF (cP)', s: 'Max.', w: 40, v: p => na(p.viscMax) },
+    { g: 'p.H', s: 'Min.', w: 36, v: p => na(p.phMin) }, { g: 'p.H', s: 'Max.', w: 36, v: p => na(p.phMax) },
+    { g: 'ANÁLISE VISUAL', w: 170, v: p => txt(p.visual) },
+    { g: 'TESTE ESPECÍFICOS, conf. ensaios na IT 001', w: 122, v: p => testes(p, [p.colagem, p.umidade ? 'Umidade ' + p.umidade : '']) }];
+  if (k === 'mp') return [
+    { g: 'Código MP', w: 70, v: p => txt(p.codigo) }, { g: 'Matéria Prima (Nome Usual)', w: 120, v: p => p.nome },
+    { g: 'Densidade (g/cm3)', s: 'Min.', w: 60, v: p => na(p.densMin) }, { g: 'Densidade (g/cm3)', s: 'Max.', w: 60, v: p => na(p.densMax) },
+    { g: 'p.H', s: 'Min.', w: 60, v: p => na(p.phMin) }, { g: 'p.H', s: 'Max.', w: 60, v: p => na(p.phMax) },
+    { g: 'TESTE ESPECÍFICOS, conf. ensaios na IT 000', w: 150, v: p => testes(p, [p.colagem, p.odor ? 'Teste Odor' : '', p.viscMin != null ? `Viscosidade ${na(p.viscMin)}-${na(p.viscMax)} ${viscUnit(p)}` : '']) },
+    { g: 'Aparência (Visual)', w: 180, v: p => txt(p.visual) }];
+  return [
+    { g: 'Código MP', w: 50, v: p => txt(p.codigo) }, { g: 'Produto Intermediário (Nome Usual)', w: 130, v: p => p.nome },
+    { g: 'Densidade (g/mL)', s: 'Min.', w: 42, v: p => na(p.densMin) }, { g: 'Densidade (g/mL)', s: 'Max.', w: 42, v: p => na(p.densMax) },
+    { g: 'p.H', s: 'Min.', w: 38, v: p => na(p.phMin) }, { g: 'p.H', s: 'Max.', w: 38, v: p => na(p.phMax) },
+    { g: 'Aparência (visual)', w: 150, v: p => txt(p.visual) },
+    { g: 'Teste de Aplicação (Colagem)', w: 70, v: p => txt(p.colagem) },
+    { g: 'Umidade', w: 60, v: p => faixaOuTxt(p, 'umidMin', 'umidMax', 'umidade') },
+    { g: 'Defloculação', w: 60, v: p => txt(p.defloculacao) },
+    { g: 'Resíduo (%)', w: 80, v: p => faixaOuTxt(p, 'resMin', 'resMax', 'residuo') }];
+}
+function espHistorico(k) {
+  const by = new Map(); espDe(k).forEach(x => { if (!by.has(x.rev)) by.set(x.rev, []); by.get(x.rev).push(x); });
+  return [...by.entries()].sort((a, b) => a[0] - b[0]).map(([rev, l]) => {
+    const g = (t) => [...new Set(l.filter(x => t.includes(x.tipo)).map(x => x.item))];
+    const ins = g(['inclusao', 'reinclusao']), exc = g(['exclusao']), alt = g(['alteracao']);
+    const mot = [...new Set(l.map(x => x.motivo).filter(Boolean))];
+    const parts = []; if (ins.length) parts.push('Itens inseridos: ' + ins.join(', ')); if (exc.length) parts.push('Itens excluídos: ' + exc.join(', ')); if (alt.length) parts.push('Itens alterados: ' + alt.join(', '));
+    if (mot.length) parts.push(mot.join('; ')); if (!parts.length) parts.push(l.find(x => x.detalhe)?.detalhe || 'Revisão registrada');
+    const dt = l.filter(x => x.tipo !== 'alteracao').map(x => x.data).sort().pop() || l.map(x => x.data).sort().pop();
+    return { rev, data: dt, motivo: parts.join('. ') };
+  });
+}
+function pdfEsp(mod) {
+  const k = mod.key, D0 = ESPDOC[k], d = D[k]; const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter', orientation: 'landscape' });
+  const X = 16, W = 760, R = X + W, TEAL = [33, 89, 104], LBLUE = [197, 217, 241];
+  const cur = espAtual(k), rv = cur ? String(cur.rev) : '—';
+  const mudou = new Set(cur ? espDe(k).filter(x => x.rev === cur.rev && x.tipo !== 'exclusao' && x.tipo !== 'inicial').map(x => normNome(x.item)) : []);
+  const cols = espColunas(k); const itens = [...d.itens.values()].filter(p => p.ativo !== false).sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
+  doc.setLineWidth(0.5); doc.setDrawColor(0);
+  const cabecalho = () => {
+    doc.rect(X, 14, W, 34); doc.line(X + 210, 14, X + 210, 48); doc.addImage(LOGO, 'JPEG', X + 55, 16, 54, 30);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0); doc.text(D0.titulo, X + 210 + (W - 210) / 2, 34, { align: 'center' });
+    const cw = [150, 210, 210, 190]; const lb = ['Código', 'Revisão', 'Data', 'Página']; let x = X;
+    lb.forEach((t, i) => { doc.rect(x, 48, cw[i], 10); doc.rect(x, 58, cw[i], 10); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.text(t, x + cw[i] / 2, 55.5, { align: 'center' }); x += cw[i]; });
+    doc.setFont('helvetica', 'normal'); doc.text(D0.cod, X + 75, 65.5, { align: 'center' }); doc.text(rv, X + 150 + 105, 65.5, { align: 'center' }); doc.text(cur?.data ? dataBR(cur.data) : '', X + 360 + 105, 65.5, { align: 'center' });
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('1- Objetivo', X, 78); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.text(D0.obj, X, 89);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.text('OBS: O n.a identifica que não consta valores para a especificação.', X, 99);
+    doc.setTextColor(58, 103, 190); doc.setFont('times', 'bolditalic'); doc.setFontSize(19); doc.text('Cópia Controlada', X + 600, 92, { renderingMode: 'stroke' }); doc.setTextColor(0);
+    return 104;
+  };
+  const tabHead = (y) => {
+    let x = X; const H1 = 16, H2 = 9; doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
+    for (let i = 0; i < cols.length;) {
+      const c = cols[i]; if (!c.s) { doc.setFillColor(...TEAL); doc.rect(x, y, c.w, H1 + H2, 'FD'); doc.setTextColor(255); const t = doc.splitTextToSize(c.g, c.w - 6); doc.text(t, x + c.w / 2, y + (H1 + H2) / 2 + 2.5 - (t.length - 1) * 4, { align: 'center' }); x += c.w; i++; continue; }
+      let j = i, gw = 0; while (j < cols.length && cols[j].g === c.g && cols[j].s) { gw += cols[j].w; j++; }
+      doc.setFillColor(...TEAL); doc.rect(x, y, gw, H1, 'FD'); doc.setTextColor(255); doc.text(c.g, x + gw / 2, y + 10.5, { align: 'center' });
+      let xx = x; for (let q = i; q < j; q++) { doc.setFillColor(...LBLUE); doc.rect(xx, y + H1, cols[q].w, H2, 'FD'); doc.setTextColor(0); doc.text(cols[q].s, xx + cols[q].w / 2, y + H1 + 6.5, { align: 'center' }); xx += cols[q].w; }
+      x += gw; i = j;
+    }
+    doc.setTextColor(0); doc.setFont('helvetica', 'normal'); return y + H1 + H2;
+  };
+  let y = tabHead(cabecalho());
+  doc.setFontSize(6.8); doc.setLineWidth(0.3);
+  for (const p of itens) {
+    const vals = cols.map(c => doc.splitTextToSize(String(c.v(p)), c.w - 4));
+    const lines = Math.max(...vals.map(v => v.length)); const h = 4 + lines * 7.4;
+    if (y + h > 596) { doc.addPage(); y = tabHead(14); doc.setFontSize(6.8); doc.setLineWidth(0.3); }
+    const destaque = mudou.has(normNome(p.nome)); let x = X;
+    doc.setFont('helvetica', destaque ? 'italic' : 'normal');
+    cols.forEach((c, i) => {
+      if (c.cinza) { doc.setFillColor(217, 217, 217); doc.rect(x, y, c.w, h, 'FD'); } else doc.rect(x, y, c.w, h);
+      const t = vals[i]; const ty = y + (h - t.length * 7.4) / 2 + 5.6;
+      t.forEach((ln, li) => { const tx = c.al === 'left' ? x + 2 : x + c.w / 2; doc.text(ln, tx, ty + li * 7.4, c.al === 'left' ? undefined : { align: 'center' });
+        if (destaque) { const tw = doc.getTextWidth(ln); const x0 = c.al === 'left' ? tx : tx - tw / 2; doc.line(x0, ty + li * 7.4 + 1, x0 + tw, ty + li * 7.4 + 1); } });
+      x += c.w;
+    });
+    y += h;
+  }
+  // elaborador / aprovador + histórico
+  const rs = ESPRESP.cfg[k] || {}; const hist = espHistorico(k);
+  if (y + 60 > 596) { doc.addPage(); y = 14; }
+  y += 12; doc.setLineWidth(0.5); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  doc.rect(X + 90, y, 290, 18); doc.rect(X + 380, y, 290, 18);
+  doc.setFont('helvetica', 'bold'); doc.text('Elaborador:', X + 160, y + 12); doc.text('Aprovador:', X + 450, y + 12); doc.setFont('helvetica', 'normal'); doc.text(rs.elaborador || '', X + 210, y + 12); doc.text(rs.aprovador || '', X + 497, y + 12);
+  y += 30; doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.text('2- Histórico', X + 20, y); y += 4;
+  const hw = [150, 70, 470], hx = X + 35;
+  const hHead = (yy) => { let x = hx; doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); ['Data', 'Revisão', 'Motivo'].forEach((t, i) => { doc.rect(x, yy, hw[i], 11); doc.text(t, x + hw[i] / 2, yy + 8, { align: 'center' }); x += hw[i]; }); doc.setFont('helvetica', 'normal'); return yy + 11; };
+  y = hHead(y); doc.setFontSize(6.6);
+  for (const h of hist) {
+    const m = doc.splitTextToSize(h.motivo, hw[2] - 6); const hh = Math.max(11, 4 + m.length * 7.2);
+    if (y + hh > 596) { doc.addPage(); y = hHead(14); doc.setFontSize(6.6); }
+    let x = hx; doc.rect(x, y, hw[0], hh); doc.text(h.data ? dataBR(h.data) : '', x + hw[0] / 2, y + hh / 2 + 2.5, { align: 'center' }); x += hw[0];
+    doc.rect(x, y, hw[1], hh); doc.text(String(h.rev), x + hw[1] / 2, y + hh / 2 + 2.5, { align: 'center' }); x += hw[1];
+    doc.rect(x, y, hw[2], hh); doc.text(m, x + 3, y + 7.5); y += hh;
+  }
+  const np = doc.getNumberOfPages(); doc.setPage(1); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.text(`1/${np}`, X + 570 + 95, 65.5, { align: 'center' });
+  return { data: doc.output('arraybuffer'), nome: `${D0.cod.replace(' ', '_')}_${slug(D0.titulo)}_Rev${rv === '—' ? 'SN' : rv}.pdf` };
+}
+async function gerarEspPdf() {
+  if (!window.jspdf) { toast('O gerador de PDF não carregou. Recarregue a página.'); return; }
+  if (!S.downloads) { toast('Download indisponível nesta visualização.'); return; }
+  if (!D[M.key].loaded) { toast('Aguarde as especificações carregarem.'); return; }
+  try { const r = pdfEsp(M); await S.downloads.save({ filename: r.nome, data: r.data }); }
+  catch (x) { if (x?.code !== 'declined') { console.warn(x); toast('Não foi possível gerar a ESP em PDF.'); } }
+}
+document.addEventListener('click', (e) => { if (e.target.closest('[data-esppdf]')) gerarEspPdf(); });
+function startEspResp() { if (ESPRESP.started || !S.db) return; ESPRESP.started = true; S.db.doc('config/espdoc').get().then(s => { if (s.exists) ESPRESP.cfg = s.data() || {}; }).catch(() => {}); }
+$('espResp').addEventListener('click', () => { const c = ESPRESP.cfg[M.key] || {}; $('erSub').textContent = `${ESPDOC[M.key].cod} · ${ESPDOC[M.key].titulo}`; $('erElab').value = c.elaborador || ''; $('erAprov').value = c.aprovador || ''; $('erErr').hidden = true; $('dEspResp').showModal(); });
+$('erForm').addEventListener('submit', async (e) => {
+  e.preventDefault(); if (!podeEsp()) return;
+  const cfg = { ...ESPRESP.cfg, [M.key]: { elaborador: $('erElab').value.trim(), aprovador: $('erAprov').value.trim() } };
+  try { await S.db.doc('config/espdoc').set(cfg); ESPRESP.cfg = cfg; $('dEspResp').close(); toast('Elaborador e aprovador salvos'); }
+  catch { $('erErr').textContent = 'Não foi possível salvar.'; $('erErr').hidden = false; }
+});
 function infoFr(mod) {
   const c = FRREV.cfg[mod.key] || {}, h = (c.hist || []).slice(-1)[0];
   return { documento: `${frOf(mod)} · ${mod.title}`, rev: frRevOf(mod), anterior: h?.de ?? null, data: c.data || hoje(), por: c.por || '', motivo: c.motivo || '', mudancas: [] };
@@ -1558,11 +1750,112 @@ function infoEsp(mod, rev) {
   const l = espDe(mod.key).filter(x => x.rev === rev).sort((a, b) => (a.em || '').localeCompare(b.em || ''));
   const princ = l.filter(x => x.tipo !== 'alteracao').slice(-1)[0] || l.slice(-1)[0] || {};
   const mot = [...new Set(l.map(x => x.motivo).filter(Boolean))].join('; ');
-  return { documento: `ESP · Especificações de ${mod.item} (${frOf(mod)})`, rev: String(rev).padStart(2, '0'), anterior: rev > 0 ? String(rev - 1).padStart(2, '0') : null, data: princ.data || hoje(), por: princ.por || '', motivo: mot,
+  return { documento: `${ESPDOC[mod.key].cod} - ${ESPDOC[mod.key].titulo}`, rev: String(rev).padStart(2, '0'), anterior: rev > 0 ? String(rev - 1).padStart(2, '0') : null, data: princ.data || hoje(), por: princ.por || '', motivo: mot,
     mudancas: l.filter(x => x.tipo !== 'inicial').map(x => `${ESPT[x.tipo]?.[1] || x.tipo}: ${x.item}${x.detalhe && x.tipo !== 'exclusao' ? ' · ' + x.detalhe : ''}`) };
 }
 $('frAss').addEventListener('click', () => gerarListaAss(infoFr(M)));
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-espass]'); if (!b) return; const rv = b.dataset.espass === 'atual' ? espAtual(M.key)?.rev : +b.dataset.espass; if (rv == null) { toast('Defina o número da ESP primeiro.'); return; } gerarListaAss(infoEsp(M, rv)); });
+
+/* ---------- informativo técnico e FDS por produto ---------- */
+const DOCT = { it: 'Informativo técnico', fds: 'FDS' };
+const DOCS = { map: new Map(), started: false };
+const docKey = (nome) => 'pa-' + slug(normNome(nome));
+function docsDe(nome, tipo) { const d = DOCS.map.get(docKey(nome)); return ((d && d[tipo]) || []).slice().sort((a, b) => (b.data || b.em || '').localeCompare(a.data || a.em || '')); }
+function docLink(a, txt) { return `<a href="/_blob/${esc(a.id)}" target="_blank" rel="noopener" title="${esc(a.nome)}">${esc(txt || a.nome)}</a>`; }
+function docsCell(p) {
+  const out = ['it', 'fds'].map(t => { const l = docsDe(p.nome, t); return l.length ? `<span style="white-space:nowrap">${docLink(l[0], t === 'it' ? 'IT' : 'FDS')}${l.length > 1 ? ` <button type="button" class="btn small" data-docs="${esc(p.nome)}" data-tipo="${t}" title="Versões anteriores">+${l.length - 1}</button>` : ''}</span>` : ''; }).filter(Boolean);
+  return out.length ? out.join(' · ') : '<span class="src">—</span>';
+}
+function startDocs() {
+  if (DOCS.started || !S.db) return; DOCS.started = true;
+  S.db.collection('docs_produto').onSnapshot((snap) => { DOCS.map = new Map(snap.docs.map(x => [x.id, x.data()])); if (S.tab === 'especificacoes' && M.docs) renderSpecs(); if ($('dSpec').open) renderSpecDocs(); if (S.tab === 'laudos') renderLaudoDocs(); }, () => {});
+}
+async function salvarDocs(nome, tipo, novos) {
+  const key = docKey(nome), cur = DOCS.map.get(key) || { produto: normNome(nome), it: [], fds: [] };
+  const doc = { produto: cur.produto || normNome(nome), it: cur.it || [], fds: cur.fds || [], atualizadoEm: new Date().toISOString() };
+  doc[tipo] = [...doc[tipo], ...novos];
+  await S.db.collection('docs_produto').doc(key).set(doc); DOCS.map.set(key, doc);
+}
+async function subirDoc(f) { const r = await S.assets.upload(f, window.QC_CONFIG ? { contentType: 'application/pdf', pasta: 'docs' } : { type: 'application/pdf' }); return r.id; }
+function renderSpecDocs() {
+  const box = $('specDocs'); const p = specEditing ? st().itens.get(specEditing) : null;
+  box.hidden = !(M.docs && p); if (box.hidden) return;
+  const pode = podeEsp() && S.assets;
+  box.innerHTML = ['it', 'fds'].map(t => { const l = docsDe(p.nome, t);
+    return `<div style="margin-bottom:8px"><div class="row" style="justify-content:space-between;align-items:center"><span class="label">${DOCT[t]}</span>${pode ? `<label class="btn small" style="cursor:pointer">Anexar PDF<input type="file" accept=".pdf,application/pdf" class="sr" data-docup="${t}"></label>` : ''}</div>`
+      + (l.length ? l.map((a, i) => `<div style="font-size:13px">${i === 0 ? '<span class="chip ok">Atual</span> ' : '<span class="src">anterior</span> '}${docLink(a)} <span class="src">${a.data ? dataBR(a.data) : ''}</span></div>`).join('') : '<div class="src" style="font-size:13px">Nenhum arquivo.</div>') + '</div>'; }).join('');
+}
+$('specDocs').addEventListener('change', async (e) => {
+  const inp = e.target.closest('[data-docup]'); if (!inp || !inp.files[0]) return;
+  const p = st().itens.get(specEditing), f = inp.files[0], t = inp.dataset.docup; inp.value = '';
+  try { toast('Enviando…'); const id = await subirDoc(f); await salvarDocs(p.nome, t, [{ id, nome: f.name, data: dataDoNome(f.name) || hoje(), em: new Date().toISOString(), tam: f.size }]); renderSpecDocs(); toast(`${DOCT[t]} anexado a ${p.nome}`); }
+  catch { toast('Não foi possível enviar o arquivo.'); }
+});
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-docs]'); if (!b) return; e.preventDefault(); e.stopPropagation();
+  const l = docsDe(b.dataset.docs, b.dataset.tipo);
+  $('ddSub').textContent = DOCT[b.dataset.tipo]; $('ddTitle').textContent = b.dataset.docs;
+  $('ddBody').innerHTML = l.map((a, i) => `<tr><td class="mono">${a.data ? dataBR(a.data) : '—'}</td><td>${docLink(a)}${i === 0 ? ' <span class="chip ok">Atual</span>' : ''}</td><td class="src">${a.em ? dataBR(a.em.slice(0, 10)) : ''}</td></tr>`).join('');
+  $('dDocs').showModal();
+}, true);
+// importação em lote: casa o nome do arquivo com o produto
+function limpaNomeDoc(n) {
+  return normNome(n.replace(/\.pdf$/i, '').replace(/[_]+/g, ' '))
+    .replace(/\b(FDS|FISPQ|SDS|MSDS|IT|INF|INFORMATIVO|TECNICO|TÉCNICO|BOLETIM|FICHA|DADOS|DE|SEGURANCA|SEGURANÇA|REV|REVISAO|REVISÃO|R\d{1,2}|REV\.?\s*\d+|V\d+)\b\.?/g, ' ')
+    .replace(/\b\d{1,2}[-._/]\d{1,2}[-._/]\d{2,4}\b/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function casaProduto(nomeArq) {
+  const alvo = slug(limpaNomeDoc(nomeArq)); if (!alvo || alvo === 'X') return null;
+  const itens = [...D.pa.itens.values()];
+  const ex = itens.find(p => slug(normNome(p.nome)) === alvo); if (ex) return ex.nome;
+  const cand = itens.filter(p => { const k = slug(normNome(p.nome)); return ('-' + alvo + '-').includes('-' + k + '-') || ('-' + k + '-').includes('-' + alvo + '-'); })
+    .sort((a, b) => slug(b.nome).length - slug(a.nome).length);
+  return cand.length && (cand.length === 1 || slug(cand[0].nome).length > slug(cand[1].nome).length) ? cand[0].nome : null;
+}
+let DI = null;
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-docimp]'); if (!b) return; DI = { tipo: b.dataset.docimp }; $('fDocs').click(); });
+$('fDocs').addEventListener('change', () => {
+  const files = [...$('fDocs').files].filter(f => /\.pdf$/i.test(f.name)); $('fDocs').value = '';
+  if (!files.length || !DI) return;
+  DI.files = files.map(f => ({ f, prod: casaProduto(f.name) || '', data: dataDoNome(f.name) || new Date(f.lastModified).toISOString().slice(0, 10) }));
+  $('dlDocProd').innerHTML = [...D.pa.itens.values()].map(p => `<option value="${esc(p.nome)}">`).join('');
+  $('diTitle').textContent = `Importar ${DOCT[DI.tipo]}`;
+  const ok = DI.files.filter(x => x.prod).length;
+  $('diInfo').innerHTML = `<b>${DI.files.length}</b> PDF(s). ${ok} ligados automaticamente a um produto. ${DI.files.length - ok ? `<span class="err" style="display:inline">${DI.files.length - ok} sem produto: escolha na coluna Produto ou deixe em branco para pular.</span>` : ''} Arquivos já enviados (mesmo nome e tamanho) são pulados.`;
+  $('diBody').innerHTML = DI.files.map((x, i) => `<tr><td style="max-width:320px;overflow-wrap:anywhere">${esc(x.f.name)}</td><td><input type="text" list="dlDocProd" data-di="${i}" value="${esc(x.prod)}" placeholder="Escolha o produto" style="min-width:240px"></td><td class="mono">${dataBR(x.data)}</td></tr>`).join('');
+  $('diProg').hidden = true; $('diErr').hidden = true; $('diGo').disabled = false; $('diGo').textContent = 'Enviar'; $('dDocImp').showModal();
+});
+$('diBody').addEventListener('input', (e) => { const i = e.target.dataset.di; if (i != null) DI.files[i].prod = normNome(e.target.value); });
+$('diGo').addEventListener('click', async () => {
+  if (!DI || DI.running) return;
+  const nomes = new Set([...D.pa.itens.values()].map(p => normNome(p.nome)));
+  const plan = DI.files.filter(x => x.prod && nomes.has(normNome(x.prod)));
+  const ruins = DI.files.filter(x => x.prod && !nomes.has(normNome(x.prod)));
+  if (ruins.length) { $('diErr').textContent = `Produto não encontrado: ${ruins.slice(0, 3).map(x => x.prod).join(', ')}. Escolha um produto da lista.`; $('diErr').hidden = false; return; }
+  if (!plan.length) { $('diErr').textContent = 'Nenhum arquivo ligado a produto.'; $('diErr').hidden = false; return; }
+  DI.running = true; $('diGo').disabled = true; $('diProg').hidden = false; let n = 0, pul = 0, fal = 0;
+  const grupos = new Map(); plan.forEach(x => { const k = normNome(x.prod); if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(x); });
+  for (const [prod, itens] of grupos) {
+    const ja = new Set(docsDe(prod, DI.tipo).map(a => a.nome + '|' + a.tam)); const novos = [];
+    for (const x of itens) {
+      $('diTxt').textContent = `Enviando ${n + 1} de ${plan.length}: ${x.f.name}`;
+      if (ja.has(x.f.name + '|' + x.f.size)) { pul++; } else {
+        try { const id = await subirDoc(x.f); novos.push({ id, nome: x.f.name, data: x.data, em: new Date().toISOString(), tam: x.f.size }); } catch (er) { fal++; if (er?.code === 'quota_exceeded') break; }
+      }
+      n++; $('diBar').style.width = (n / plan.length * 100).toFixed(1) + '%';
+    }
+    if (novos.length) { try { await salvarDocs(prod, DI.tipo, novos); } catch { fal += novos.length; } }
+  }
+  DI.running = false; $('diTxt').textContent = `Concluído: ${n - pul - fal} enviado(s), ${pul} já existiam${fal ? `, ${fal} com erro` : ''}.`; $('diGo').textContent = 'Concluído';
+  if (S.tab === 'especificacoes') renderSpecs();
+});
+// no laudo: atalhos para IT e FDS do produto
+function renderLaudoDocs() {
+  const el = $('lDocs'); if (!el) return; const r = LZ.rec;
+  if (!r) { el.innerHTML = ''; return; }
+  const it = docsDe(r.produto, 'it')[0], fds = docsDe(r.produto, 'fds')[0];
+  el.innerHTML = it || fds ? `Documentos do produto: ${it ? docLink(it, 'Informativo técnico') : ''}${it && fds ? ' · ' : ''}${fds ? docLink(fds, 'FDS') : ''}` : '';
+}
 /* ---------- validade da matéria-prima ---------- */
 const VSTAT = { venc: ['venc', 'Vencida'], prox: ['prox', 'Vence em breve'], ok: ['ok', 'Dentro da validade'], lib: ['lib', 'Liberada pela direção'], sem: ['sem', 'Sem validade'], enc: ['enc', 'Inativo'] };
 const lotKey = (r) => String(r._id || '').replace(/[^A-Za-z0-9_\-.~:@+]/g, '_');
@@ -1846,7 +2139,7 @@ function pickLaudoRec(r) {
   const add = (nome, padrao, resultado, on) => ens.push({ on, nome, padrao: padrao || '-', resultado: resultado || '' });
   if (r.dens != null) add('DENSIDADE g/mL a 25°C', faixaTxt(sp.densMin, sp.densMax, 2), resTxt(r.dens), true);
   if (r.ph != null) add('PH', faixaTxt(sp.phMin, sp.phMax), resTxt(r.ph), true);
-  if (r.visc != null) add(`VISCOSIDADE${item.viscCopo ? ' ' + item.viscCopo : ''} (s)`, faixaTxt(sp.viscMin, sp.viscMax), resTxt(r.visc), true);
+  if (r.visc != null) { const vp = sp.viscTipo ? sp : item; add(`VISCOSIDADE${(vp.viscCopo || item.viscCopo) ? ' ' + (vp.viscCopo || item.viscCopo).toUpperCase() : ''} (${viscUnit(vp)})`, faixaTxt(sp.viscMin, sp.viscMax), resTxt(r.visc), true); }
   if (r.umid != null) add('UMIDADE (%)', item.umidade || '-', resTxt(r.umid), true);
   (sp.extras || []).forEach(e => { const v = r.extras?.[e.id]; if (v != null && v !== '') add(e.nome.toUpperCase() + (e.unidade && e.tipo !== 'aprovacao' ? ` (${e.unidade})` : ''), e.tipo === 'aprovacao' ? (e.descricao || '-') : faixaTxt(e.min, e.max), resTxt(v), true); });
   if (r.imperm) add('TESTE DE IMPERMEABILIDADE', '-', resTxt(r.imperm), false);
@@ -1908,7 +2201,7 @@ function laudoBlock(forEmit) {
 }
 function renderLaudo() {
   const L = laudoData(), r = LZ.rec, sel = $('lSel'), h = LZ.cur;
-  $('lNovo').hidden = !r; $('lOutro').hidden = !(r && h) || isFat();
+  $('lNovo').hidden = !r; $('lOutro').hidden = !(r && h) || isFat(); renderLaudoDocs();
   if (!r) { sel.className = 'lwarn pend'; sel.textContent = isFat() ? 'Escolha um laudo na fila "Aguardando faturamento".' : 'Nenhum laudo aberto. Escolha um lote ou um laudo da fila.'; $('lConfRow').hidden = true; }
   else if (h) {
     sel.className = h.status === 'emitido' ? 'lwarn ok' : 'lwarn pend';
@@ -2157,6 +2450,7 @@ function parseColl(path) {
   if (s[0] === 'mp_lotes') return { kind: 'lotes' };
   if (s[0] === 'mp_laudos') return { kind: 'pasta' };
   if (s[0] === 'esp_revisoes') return { kind: 'esp' };
+  if (s[0] === 'docs_produto') return { kind: 'docs' };
   throw new Error('Coleção desconhecida: ' + path);
 }
 async function fetchColl(c) {
@@ -2165,12 +2459,13 @@ async function fetchColl(c) {
   if (c.kind === 'lotes') return must(await SB.from('lotes_mp').select('id,dados')).map(r => ({ id: r.id, d: r.dados }));
   if (c.kind === 'pasta') return must(await SB.from('laudos_mp_pasta').select('id,dados')).map(r => ({ id: r.id, d: r.dados }));
   if (c.kind === 'esp') return must(await SB.from('esp_revisoes').select('id,dados')).map(r => ({ id: r.id, d: r.dados }));
+  if (c.kind === 'docs') return must(await SB.from('docs_produto').select('id,dados')).map(r => ({ id: r.id, d: r.dados }));
   return must(await SB.from('laudos').select('id,dados').order('atualizado_em', { ascending: false }).limit(c.limit || 300)).map(r => ({ id: r.id, d: r.dados }));
 }
 const snapOf = (rows) => { const docs = rows.map(r => ({ id: r.id, exists: true, data: () => r.d, metadata: { fromCache: false, hasPendingWrites: false } })); return { docs, size: docs.length, empty: !docs.length, docChanges: () => [], metadata: { fromCache: false, hasPendingWrites: false } }; };
 function collRef(path, opts = {}) {
   const c = { ...parseColl(path), ...opts };
-  const table = { itens: 'itens', live: 'registros', laudos: 'laudos', lotes: 'lotes_mp', pasta: 'laudos_mp_pasta', esp: 'esp_revisoes' }[c.kind];
+  const table = { itens: 'itens', live: 'registros', laudos: 'laudos', lotes: 'lotes_mp', pasta: 'laudos_mp_pasta', esp: 'esp_revisoes', docs: 'docs_produto' }[c.kind];
   const ref = {
     path,
     orderBy: () => collRef(path, c), limit: (n) => collRef(path, { ...c, limit: n }), where: () => collRef(path, c),
@@ -2199,6 +2494,7 @@ function collRef(path, opts = {}) {
           else if (c.kind === 'lotes') must(await SB.from('lotes_mp').upsert({ id, dados: d, atualizado_em: new Date().toISOString() }));
           else if (c.kind === 'pasta') must(await SB.from('laudos_mp_pasta').upsert({ id, dados: d, atualizado_em: new Date().toISOString() }));
           else if (c.kind === 'esp') must(await SB.from('esp_revisoes').insert({ id, dados: d }));
+          else if (c.kind === 'docs') must(await SB.from('docs_produto').upsert({ id, dados: d, atualizado_em: new Date().toISOString() }));
           else must(await SB.from('laudos').update({ status: d.status || null, dados: d }).eq('id', id));
           kickAll();
         },
@@ -2242,7 +2538,7 @@ function makeClaudeShim(p) {
   const db = { collection: (path) => collRef(path), doc: (path) => docRef(path) };
   const user = { id: async () => S.uid, isOwner: async () => admin, canEdit: async () => admin, can: async () => true };
   const downloads = { async save({ filename, data }) { const blob = data instanceof Blob ? data : new Blob([data], { type: /\.pdf$/i.test(filename) ? 'application/pdf' : 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); return true; } };
-  const assets = (admin || p.perfil === 'laboratorio') ? { async upload(file) { const path = `${new Date().getFullYear()}/${crypto.randomUUID()}.pdf`; const { error } = await SB.storage.from('laudos-mp').upload(path, file, { contentType: 'application/pdf' }); if (error) throw { code: /size|large/i.test(error.message) ? 'too_large' : 'unavailable', message: error.message }; return { id: path, url: '' }; } } : null;
+  const assets = (admin || p.perfil === 'laboratorio') ? { async upload(file, opts = {}) { const path = `${opts.pasta === 'docs' ? 'docs/' : ''}${new Date().getFullYear()}/${crypto.randomUUID()}.pdf`; const { error } = await SB.storage.from('laudos-mp').upload(path, file, { contentType: 'application/pdf' }); if (error) throw { code: /size|large/i.test(error.message) ? 'too_large' : 'unavailable', message: error.message }; return { id: path, url: '' }; } } : null;
   const caps = { db, user, downloads, assets };
   return { use: async (n) => caps[n] || null };
 }
