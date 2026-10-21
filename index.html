@@ -438,7 +438,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
           </div>
         </div>
         <div class="panel">
-          <div class="hd"><span class="label">Dados do laudo</span><button type="button" class="btn small" id="lNovo" hidden>Limpar</button></div>
+          <div class="hd"><span class="label">Dados do laudo</span><div class="row" style="gap:6px"><button type="button" class="btn small" id="lOutro" hidden title="Cria um laudo novo do mesmo lote, com os mesmos ensaios, para outro cliente">Novo laudo para outro cliente</button><button type="button" class="btn small" id="lNovo" hidden>Limpar</button></div></div>
           <div class="bd" style="display:flex;flex-direction:column;gap:14px">
             <div id="lSel" class="lwarn pend">Nenhum laudo aberto.</div>
             <div class="field"><label for="lCliente">Nome do cliente</label><input type="text" id="lCliente" list="dlClientes" autocomplete="off" placeholder="Ex.: ETERNIT S.A."></div>
@@ -563,7 +563,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
     <p class="src">Usuário inativo não consegue entrar. Para excluir uma conta de vez, use o painel do Supabase (Authentication &gt; Users).</p>
     <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">
       <div class="label" style="margin-bottom:4px">Pré-cadastro</div>
-      <p class="src" style="margin:0 0 8px">Cadastre o e-mail e o perfil da pessoa. Quando ela clicar em <b>Criar conta</b> com esse e-mail, já entra com o perfil certo, sem esperar liberação.</p>
+      <p class="src" style="margin:0 0 8px">Cadastre o e-mail e o perfil da pessoa. Quando ela clicar em <b>Criar conta</b> com esse e-mail, já entra com o perfil certo. O pré-cadastro não manda e-mail sozinho: use <b>Enviar convite</b> (abre seu e-mail) ou <b>Copiar convite</b> (para WhatsApp).</p>
       <div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end">
         <div class="field" style="flex:1 1 150px"><label for="cvNome">Nome</label><input type="text" id="cvNome"></div>
         <div class="field" style="flex:1 1 200px"><label for="cvEmail">E-mail</label><input type="email" id="cvEmail"></div>
@@ -1113,6 +1113,15 @@ function renderRegistros() {
 }
 $('rBody').addEventListener('click', (e) => { if (e.target.closest('a')) return; const tr = e.target.closest('tr[data-id]'); if (!tr) return; const r = allRecs(st().rMes).find(x => x._id === tr.dataset.id); if (r) openRec(r); });
 
+function rastreio(r) {
+  if (!LZ.started) startLaudos();
+  const l = laudosDoLote(r).slice().sort((a, b) => (a.dataEntrega || a.atualizadoEm || '').localeCompare(b.dataEntrega || b.atualizadoEm || ''));
+  if (!l.length) return `<dt>Enviado para</dt><dd class="src">Nenhum laudo emitido para este lote.</dd>`;
+  const tot = l.reduce((a, x) => a + (parseNum(x.qtd) || 0), 0);
+  return `<dt>Enviado para</dt><dd><table class="acc" style="font-size:12.5px;margin:2px 0"><thead><tr><th>Cliente</th><th>NF</th><th>Qtd.</th><th>Entrega</th><th>Laudo</th></tr></thead><tbody>`
+    + l.map(x => `<tr><td>${esc(x.cliente || '—')}</td><td class="mono">${esc(x.nf || '—')}</td><td class="mono">${x.qtd ? esc(qtdTxt(x.qtd)) : '—'}</td><td class="mono">${x.dataEntrega ? dataBR(x.dataEntrega) : '—'}</td><td>${x.status === 'emitido' ? '<span class="chip ok">Emitido</span>' : '<span class="chip na">Aguardando faturamento</span>'}</td></tr>`).join('')
+    + `</tbody></table><span class="src">${l.length} cliente(s) · total enviado ${tot ? qtdTxt(tot) : '—'}</span></dd>`;
+}
 function openRec(r) {
   const ev = evalRec(r), sp = specOf(r) || {};
   $('dRecSub').textContent = `${dataBR(r.data)} · Lote ${r.lote}`;
@@ -1124,7 +1133,7 @@ function openRec(r) {
     + M.fields.map(line).join('')
     + (sp.extras || []).map(e => `<dt>${esc(e.nome)}</dt><dd><span class="num">${shown(r.extras?.[e.id])}</span>${e.unidade && e.tipo !== 'aprovacao' ? ' ' + esc(e.unidade) : ''} <span class="src">(${extraRange(e)})</span> ${chip(ev.x[e.id])}</dd>`).join('')
     + (r.rnc || r.rncStatus ? `<dt>RNC</dt><dd class="mono">${esc(r.rnc || '—')} ${esc(r.rncStatus || '')}</dd>` : '')
-    + `<dt>Analisado por</dt><dd>${esc(r.analista || '—')}</dd>` + (M.laudo ? `<dt>Laudo</dt><dd>${laudo}</dd>` : '') + `<dt>Observação</dt><dd>${esc(r.obs || '—')}</dd>`
+    + `<dt>Analisado por</dt><dd>${esc(r.analista || '—')}</dd>` + (M.laudo ? `<dt>Laudo</dt><dd>${laudo}</dd>` : '') + (M.key === 'pa' ? rastreio(r) : '') + `<dt>Observação</dt><dd>${esc(r.obs || '—')}</dd>`
     + `<dt>Origem</dt><dd class="src">${r._src === 'arquivo' ? `Importado da planilha ${frOf(M)}` : 'Registrado no app' + (r.atualizadoEm ? ' · ' + new Date(r.atualizadoEm).toLocaleString('pt-BR') : '')}${r.dataSuspeita ? '<br>A data original na planilha estava fora do mês da aba.' : ''}</dd>`;
   const act = $('dRecActions'); act.innerHTML = '';
   if (r._src === 'live' && S.db) {
@@ -1858,6 +1867,18 @@ function openLaudoDoc(h) {
 }
 function clearLaudo() { LZ.rec = null; LZ.cur = null; LZ.ens = []; ['lCliente', 'lNF', 'lQtd', 'lEntrega', 'lProducao'].forEach(id => $(id).value = ''); renderEns(); renderLaudoList(); renderPend(); renderLaudo(); }
 $('lNovo').addEventListener('click', clearLaudo);
+$('lOutro').addEventListener('click', () => {
+  if (!LZ.rec) return; const prev = LZ.cur;
+  LZ.ens = LZ.ens.map(e => ({ ...e })); LZ.cur = null; $('lConf').checked = !!prev?.confirmadoForaSpec;
+  ['lCliente', 'lNF', 'lQtd', 'lEntrega'].forEach(id => $(id).value = '');
+  renderEns(); renderLaudoList(); renderPend(); renderLaudo(); $('lCliente').focus();
+  toast(`Novo laudo do lote ${LZ.rec.lote}: preencha o cliente, a NF e a quantidade`);
+});
+const normLote = (v) => String(v ?? '').trim().toUpperCase();
+function laudosDoLote(r) {
+  if (!r) return [];
+  return (LZ.all || []).filter(h => (r._id && h.recId === r._id) || (normNome(h.produto) === normNome(r.produto) && normLote(h.lote) === normLote(r.lote)));
+}
 function renderEns() {
   const ro = isFat() ? ' disabled' : '';
   $('lEnsBody').innerHTML = LZ.ens.map((e, i) => `<tr data-i="${i}"><td class="ck"><input type="checkbox" data-k="on" aria-label="Incluir ${esc(e.nome)}" ${e.on ? 'checked' : ''}${ro}></td>
@@ -1887,7 +1908,7 @@ function laudoBlock(forEmit) {
 }
 function renderLaudo() {
   const L = laudoData(), r = LZ.rec, sel = $('lSel'), h = LZ.cur;
-  $('lNovo').hidden = !r;
+  $('lNovo').hidden = !r; $('lOutro').hidden = !(r && h) || isFat();
   if (!r) { sel.className = 'lwarn pend'; sel.textContent = isFat() ? 'Escolha um laudo na fila "Aguardando faturamento".' : 'Nenhum laudo aberto. Escolha um lote ou um laudo da fila.'; $('lConfRow').hidden = true; }
   else if (h) {
     sel.className = h.status === 'emitido' ? 'lwarn ok' : 'lwarn pend';
@@ -1897,7 +1918,7 @@ function renderLaudo() {
     const ev = evalRec(r, MODS.pa);
     if (r.situacao !== 'APROVADO') { sel.className = 'lwarn nc'; sel.innerHTML = `Lote <b>${esc(r.lote)}</b> está <b>${esc(r.situacao || 'sem situação')}</b>. Só lotes aprovados recebem laudo.`; }
     else if (ev.fora.length) { sel.className = 'lwarn nc'; sel.innerHTML = `Lote <b>${esc(r.lote)}</b> · ${esc(r.produto)} tem parâmetro fora da especificação: ${ev.fora.map(k => foraLabel(k, r, MODS.pa)).join('; ')}.`; }
-    else { sel.className = 'lwarn ok'; sel.innerHTML = `Lote <b>${esc(r.lote)}</b> · ${esc(r.produto)} · liberado em ${dataBR(r.data)} por ${esc(r.analista || '—')}.`; }
+    else { const ja = laudosDoLote(r); sel.className = 'lwarn ok'; sel.innerHTML = `Lote <b>${esc(r.lote)}</b> · ${esc(r.produto)} · liberado em ${dataBR(r.data)} por ${esc(r.analista || '—')}.` + (ja.length ? `<br>Este lote já tem ${ja.length} laudo(s): ${ja.map(x => esc(x.cliente || 'sem cliente') + (x.nf ? ' NF ' + esc(x.nf) : '')).join('; ')}. Este será um laudo novo.` : ''); }
     $('lConfRow').hidden = !(r.situacao === 'APROVADO' && ev.fora.length);
   }
   const bSend = laudoBlock(false), bEmit = laudoBlock(true);
@@ -2254,10 +2275,15 @@ $('accBody').addEventListener('change', async (e) => {
   else toast('Usuário atualizado');
   await loadUsuarios(); renderUsuarios();
 });
+const APP_URL = location.origin + location.pathname.replace(/index\.html$/, '');
+function conviteTexto(c) {
+  return `Olá${c.nome ? ' ' + c.nome.split(' ')[0] : ''}!\n\nVocê foi cadastrado(a) no app Liberação de Lotes Quimicer com o perfil ${PERFIS[c.perfil] || c.perfil}.\n\n1. Abra: ${APP_URL}\n2. Clique em "Criar conta" e use este e-mail: ${c.email}\n3. Escolha sua senha e confirme o e-mail que vai chegar (veja também o spam).\n\nDepois disso é só entrar com seu e-mail e senha.`;
+}
+const conviteMailto = (c) => `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent('Acesso ao app Liberação de Lotes Quimicer')}&body=${encodeURIComponent(conviteTexto(c))}`;
 async function loadConvites() { try { ACC.convites = must(await SB.from('convites').select('*').order('nome')); } catch { ACC.convites = []; } }
 function renderConvites() {
   const emails = new Set((ACC.lista || []).map(u => (u.email || '').toLowerCase()));
-  $('cvBody').innerHTML = (ACC.convites || []).map(c => `<tr data-email="${esc(c.email)}"><td>${esc(c.nome || '—')}</td><td>${esc(c.email)}</td><td>${esc(PERFIS[c.perfil] || c.perfil)}</td><td>${emails.has(c.email) ? '<span class="chip ok">Conta criada</span>' : '<span class="chip na">Aguardando cadastro</span>'}</td><td><button type="button" class="btn small" data-cvdel>Remover</button></td></tr>`).join('')
+  $('cvBody').innerHTML = (ACC.convites || []).map(c => `<tr data-email="${esc(c.email)}"><td>${esc(c.nome || '—')}</td><td>${esc(c.email)}</td><td>${esc(PERFIS[c.perfil] || c.perfil)}</td><td>${emails.has(c.email) ? '<span class="chip ok">Conta criada</span>' : '<span class="chip na">Aguardando cadastro</span>'}</td><td><div class="row" style="gap:6px;flex-wrap:nowrap">${emails.has(c.email) ? '' : `<a class="btn small" href="${conviteMailto(c)}">Enviar convite</a><button type="button" class="btn small" data-cvcopy>Copiar convite</button>`}<button type="button" class="btn small" data-cvdel>Remover</button></div></td></tr>`).join('')
     || '<tr><td colspan="5" class="empty">Nenhum pré-cadastro.</td></tr>';
 }
 $('cvAdd').addEventListener('click', async () => {
@@ -2272,6 +2298,8 @@ $('cvAdd').addEventListener('click', async () => {
   $('cvNome').value = ''; $('cvEmail').value = ''; toast('Pré-cadastro salvo'); await loadConvites(); renderConvites();
 });
 $('cvBody').addEventListener('click', async (e) => {
+  const cp = e.target.closest('[data-cvcopy]');
+  if (cp) { const c = (ACC.convites || []).find(x => x.email === cp.closest('tr').dataset.email); try { await navigator.clipboard.writeText(conviteTexto(c)); toast('Convite copiado: cole no WhatsApp ou no e-mail'); } catch { toast('Não foi possível copiar.'); } return; }
   const b = e.target.closest('[data-cvdel]'); if (!b) return;
   await SB.from('convites').delete().eq('email', b.closest('tr').dataset.email); await loadConvites(); renderConvites();
 });
