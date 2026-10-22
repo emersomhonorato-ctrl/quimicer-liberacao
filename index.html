@@ -1004,7 +1004,8 @@ $('relForm').addEventListener('submit', async (e) => {
   if (!rec.situacao) return err('Escolha a situação do lote.');
   if (rec.situacao === 'APROVADO' && ev.fora.length && !rec.obs) return err('Para aprovar com parâmetro fora da especificação, escreva a justificativa na observação.');
   const mes = rec.data.slice(0, 7);
-  const dup = allRecs(mes).find(r => r.lote === rec.lote && r.produto === rec.produto && !(S.editing && r._src === 'live' && S.editing.id === r.id));
+  const dup = allRecs(mes).find(r => r.lote === rec.lote && r.produto === rec.produto && !(S.editing && ((r._src === 'live' && S.editing.src !== 'arquivo' && S.editing.id === r.id) || (r._src === 'arquivo' && S.editing.aid === r._id))));
+  if (S.editing?.src === 'arquivo' && S.editing.mes !== mes) return err('Registro importado da planilha: mantenha a data dentro do mesmo mês.');
   if (dup && !$('saveBtn').dataset.force) {
     err(`O lote ${rec.lote} de ${rec.produto} já está registrado em ${dataBR(dup.data)}. Clique de novo em salvar para registrar mesmo assim.`);
     $('saveBtn').dataset.force = '1'; return;
@@ -1013,7 +1014,10 @@ $('relForm').addEventListener('submit', async (e) => {
   const doc = { ...rec, fora: ev.fora, atualizadoEm: new Date().toISOString(), atualizadoPor: S.uid || null };
   $('saveBtn').disabled = true;
   try {
-    if (S.editing) {
+    if (S.editing?.src === 'arquivo') {
+      if (!podeExcluir()) throw { code: 'invalid_argument' };
+      await salvarImportado(S.editing, doc); toast(`Lote ${rec.lote} atualizado (registro importado)`);
+    } else if (S.editing) {
       const old = S.editing;
       doc.criadoEm = old.criadoEm || doc.atualizadoEm; doc.criadoPor = old.criadoPor || S.uid || null;
       await S.db.collection(coll('meses', mes)).doc(old.id).set(doc);
@@ -1033,13 +1037,22 @@ $('relForm').addEventListener('submit', async (e) => {
   } finally { $('saveBtn').disabled = !!(S.canWrite === false); }
 });
 
+async function salvarImportado(old, doc) {
+  const d = st(), lista = (d.arquivo.get(old.mes) || []).slice(), i = +String(old.aid).split(':a')[1];
+  const orig = lista[i]; if (!orig) throw new Error('registro não encontrado');
+  const novo = { ...orig, ...doc, editadoNoApp: true }; delete novo._rid;
+  const ref = S.db.doc(`${M.col.arquivo}/${old.mes}`);
+  if (ref.atualizarRegistro) await ref.atualizarRegistro(orig._rid, novo);
+  else { const s = await ref.get(); const base = s.exists ? (s.data() || {}) : {}; const regs = (base.registros || lista.map(x => { const y = { ...x }; delete y._rid; return y; })).slice(); regs[i] = novo; await ref.set({ ...base, registros: regs }); }
+  lista[i] = { ...novo, _rid: orig._rid }; d.arquivo.set(old.mes, lista); rerender(M);
+}
 function loadIntoForm(r) {
   F.produto.value = r.produto || ''; F.lote.value = r.lote || ''; F.aux.value = r[M.aux.k] || ''; F.data.value = r.data || hoje(); F.analista.value = r.analista || '';
   M.fields.forEach(f => { const el = fin(f.k); if (!el) return; const v = r[f.k]; el.value = f.tipo === 'aprov' ? (v === 'NÃO OK' || v === 'OK' ? v : (f.req ? 'OK' : '')) : (v == null ? '' : fmt(v)); });
   F.rnc.value = r.rnc || ''; F.rncStatus.value = r.rncStatus || ''; F.obs.value = r.obs || '';
-  S.editing = { id: r.id, mes: r._mes, criadoEm: r.criadoEm, criadoPor: r.criadoPor };
+  S.editing = { id: r.id, mes: r._mes, criadoEm: r.criadoEm, criadoPor: r.criadoPor, src: r._src, aid: r._id };
   S.laudosAnt = (r.laudosAnteriores || []).slice(); setLaudo(r.laudo || null); $('fValidade').value = r.validade || '';
-  $('editBar').hidden = false; $('editTxt').textContent = `Editando lote ${r.lote} · ${r.produto}`; $('saveBtn').textContent = 'Salvar alterações';
+  $('editBar').hidden = false; $('editTxt').textContent = `Editando lote ${r.lote} · ${r.produto}${r._src === 'arquivo' ? ' (importado da planilha)' : ''}`; $('saveBtn').textContent = 'Salvar alterações';
   S.sitTouched = true; setSituacao(r.situacao || 'APROVADO', true); refreshForm(); fillExtras(r.extras); refreshForm();
   history.replaceState(null, '', hashFor('liberar')); showTab('liberar'); window.scrollTo(0, 0);
 }
@@ -1168,7 +1181,7 @@ function openRec(r) {
     + (sp.extras || []).map(e => `<dt>${esc(e.nome)}</dt><dd><span class="num">${shown(r.extras?.[e.id])}</span>${e.unidade && e.tipo !== 'aprovacao' ? ' ' + esc(e.unidade) : ''} <span class="src">(${extraRange(e)})</span> ${chip(ev.x[e.id])}</dd>`).join('')
     + (r.rnc || r.rncStatus ? `<dt>RNC</dt><dd class="mono">${esc(r.rnc || '—')} ${esc(r.rncStatus || '')}</dd>` : '')
     + `<dt>Analisado por</dt><dd>${esc(r.analista || '—')}</dd>` + (M.laudo ? `<dt>Laudo</dt><dd>${laudo}</dd>` : '') + (M.key === 'pa' ? rastreio(r) : '') + `<dt>Observação</dt><dd>${esc(r.obs || '—')}</dd>`
-    + `<dt>Origem</dt><dd class="src">${r._src === 'arquivo' ? `Importado da planilha ${frOf(M)}` : 'Registrado no app' + (r.atualizadoEm ? ' · ' + new Date(r.atualizadoEm).toLocaleString('pt-BR') : '')}${r.dataSuspeita ? '<br>A data original na planilha estava fora do mês da aba.' : ''}</dd>`;
+    + `<dt>Origem</dt><dd class="src">${r._src === 'arquivo' ? `Importado da planilha ${frOf(M)}${r.editadoNoApp ? ' · editado no app' + (r.atualizadoEm ? ' em ' + new Date(r.atualizadoEm).toLocaleString('pt-BR') : '') : ''}` : 'Registrado no app' + (r.atualizadoEm ? ' · ' + new Date(r.atualizadoEm).toLocaleString('pt-BR') : '')}${r.dataSuspeita ? '<br>A data original na planilha estava fora do mês da aba.' : ''}</dd>`;
   const act = $('dRecActions'); act.innerHTML = '';
   if (r._src === 'live' && S.db) {
     const ed = document.createElement('button'); ed.className = 'btn'; ed.textContent = 'Editar'; ed.onclick = () => { $('dRec').close(); loadIntoForm(r); };
@@ -1179,6 +1192,10 @@ function openRec(r) {
       catch { del.textContent = 'Não foi possível excluir'; }
     };
     act.append(ed); if (podeExcluir()) act.append(del);
+  }
+  if (r._src === 'arquivo' && S.db && podeExcluir()) {
+    const ed = document.createElement('button'); ed.className = 'btn'; ed.textContent = 'Editar (administrador)'; ed.onclick = () => { $('dRec').close(); loadIntoForm(r); };
+    act.append(ed);
   }
   $('dRec').showModal();
 }
@@ -2548,7 +2565,10 @@ function docRef(path) {
   const AR = { arquivo: 'pa', mp_arquivo: 'mp', pi_arquivo: 'pi' };
   if (AR[col]) {
     const modulo = AR[col];
-    return { async get() { const rows = must(await SB.from('registros').select('dados').eq('modulo', modulo).eq('mes', id).eq('origem', 'planilha').order('ordem')); return { id, exists: true, data: () => ({ registros: rows.map(r => r.dados) }), metadata: {} }; } };
+    return {
+      async get() { const rows = must(await SB.from('registros').select('id,dados').eq('modulo', modulo).eq('mes', id).eq('origem', 'planilha').order('ordem')); return { id, exists: true, data: () => ({ registros: rows.map(r => ({ ...r.dados, _rid: r.id })) }), metadata: {} }; },
+      async atualizarRegistro(rid, dados) { const r = must(await SB.from('registros').update({ dados, atualizado_em: new Date().toISOString() }).eq('id', rid).eq('origem', 'planilha').select('id')); if (!r.length) throw dbErr({ code: '42501', message: 'sem permissão' }); },
+    };
   }
   if (col === 'config') {
     return {
