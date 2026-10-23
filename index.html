@@ -272,6 +272,13 @@ dl.kv dd { margin: 0; min-width: 0 }
 }
 @media (prefers-reduced-motion: no-preference) { .chip, .vbox { transition: background-color .15s, color .15s } }
 </style>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#215968">
+<link rel="icon" type="image/png" href="favicon-64.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Liberação Quimicer">
+<meta name="application-name" content="Liberação Quimicer">
 <style>
 html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% } img { max-width: 100% }
 .gate a { color: var(--accent) } .gate a:hover { text-decoration: none }
@@ -297,7 +304,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       <a href="#laudos" data-tab="laudos" id="tabLaudos">Laudos</a>
       <a href="#validades" data-tab="validades" id="tabVal" hidden>Validades</a>
     </nav>
-    <div class="conn" id="conn"><span class="dot" id="connDot"></span><span id="connTxt">Conectando…</span><span class="perfil" id="perfilTag" hidden></span><button type="button" class="btn small" id="btnAcessos" hidden>Usuários</button><button type="button" class="btn small" id="btnSair" hidden>Sair</button></div>
+    <div class="conn" id="conn"><span class="dot" id="connDot"></span><span id="connTxt">Conectando…</span><span class="perfil" id="perfilTag" hidden></span><button type="button" class="btn small" id="btnAcessos" hidden>Usuários</button><button type="button" class="btn small" id="btnInstalar" hidden>Instalar app</button><button type="button" class="btn small" id="btnSair" hidden>Sair</button></div>
   </div>
 </header>
 
@@ -568,7 +575,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
 <datalist id="dlSpindle"><option value="1"><option value="2"><option value="3"><option value="4"><option value="5"><option value="6"><option value="7"><option value="LV-1"><option value="LV-2"><option value="LV-3"><option value="LV-4"></datalist>
 <datalist id="dlCopo"><option value="CF 2"><option value="CF 3"><option value="CF 4"><option value="CF 5"><option value="CF 6"><option value="CF 8"></datalist>
 
-<dialog id="dAcessos"><div class="hd"><div><h2 style="font-size:22px">Usuários do app</h2><p class="src" style="margin:4px 0 0">Administrador e Laboratório usam o app inteiro. Faturamento vê só os laudos do produto acabado. Qualidade consulta as especificações dos três módulos e as revisões da ESP. Só o Administrador altera especificações.</p></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
+<dialog id="dAcessos"><div class="hd"><div><h2 style="font-size:22px">Usuários do app</h2><p class="src" style="margin:4px 0 0">Administrador e Laboratório usam o app inteiro; só o Administrador exclui. Qualidade vê as especificações e as revisões da ESP, inclui itens novos e anexa Inf. técnico, FDS e laudos de matéria-prima. Faturamento vê só os laudos do produto acabado.</p></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
   <div class="bd">
     <p style="margin:0 0 10px;font-size:13px">Cada pessoa cria a própria conta na tela de entrada (<b>Criar conta</b>, com e-mail e senha). Ela aparece aqui como <b>Sem acesso</b> até você escolher o perfil.</p>
     <div class="err" id="accErr" hidden></div>
@@ -2681,5 +2688,20 @@ boot();
 })();
 </script>
 
+<script>
+(function () {
+  if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  var ev = null, b = document.getElementById('btnInstalar');
+  var instalado = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); ev = e; if (b && !instalado) b.hidden = false; });
+  window.addEventListener('appinstalled', function () { if (b) b.hidden = true; ev = null; });
+  if (b) b.addEventListener('click', async function () {
+    if (ev) { ev.prompt(); try { await ev.userChoice; } catch (x) {} ev = null; b.hidden = true; return; }
+  });
+  // Safari no Mac não dispara o aviso de instalação: mostra o botão com a instrução
+  var safari = /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|Edg\//.test(navigator.userAgent) && /Macintosh/.test(navigator.userAgent);
+  if (safari && !instalado && b) { b.hidden = false; b.addEventListener('click', function () { alert('No Safari: menu Arquivo > Adicionar ao Dock.'); }); }
+})();
+</script>
 </body>
 </html>
