@@ -733,7 +733,8 @@ const MODS = {
       { k: 'defloc', nome: 'Defloculação', short: 'Defloc.', tipo: 'aprov', txt: 'defloculacao', hint: 'Teste de aplicação' },
       { k: 'aparencia', nome: 'Aparência', short: 'Aparência', unit: 'visual', tipo: 'aprov', txt: 'visual', def: 'OK', req: true },
       { k: 'pesoIni', nome: 'Peso inicial', short: 'Peso ini.', unit: 'kg', tipo: 'livre' },
-      { k: 'pesoFin', nome: 'Peso final', short: 'Peso fin.', unit: 'kg', tipo: 'livre' }],
+      { k: 'pesoFin', nome: 'Peso final', short: 'Peso fin.', unit: 'kg', tipo: 'livre' },
+      { k: 'perda', nome: 'Perda na reação', short: 'Perda', unit: '%', tipo: 'calc', calc: (r) => perdaReacao(r), hint: '(peso inicial − peso final) ÷ peso inicial × 100' }],
     specText: [{ k: 'visual', label: 'Aparência esperada', full: true, ph: 'Ex.: Líquido leitoso' }, { k: 'umidade', label: 'Umidade (texto)' }, { k: 'residuo', label: 'Resíduo (texto)' }, { k: 'colagem', label: 'Teste de colagem' }, { k: 'defloculacao', label: 'Defloculação' }],
     laudo: false, codigo: true, csv: 'FR011',
   },
@@ -835,6 +836,7 @@ function specSnap(p, mod = M) {
   mod.fields.filter(f => f.tipo === 'faixa').forEach(f => { o[f.mn] = p[f.mn] ?? null; o[f.mx] = p[f.mx] ?? null; });
   return o;
 }
+function perdaReacao(r) { const a = parseNum(r?.pesoIni), b = parseNum(r?.pesoFin); return a != null && b != null && a > 0 ? Math.round((a - b) / a * 10000) / 100 : null; }
 function check(v, min, max) {
   if (min == null || max == null) return v == null || v === '' ? 'na' : 'free';
   const n = parseNum(v);
@@ -849,7 +851,7 @@ function evalRec(rec, mod = M) {
   mod.fields.forEach(f => {
     let s;
     if (f.tipo === 'faixa') s = check(rec[f.k], sp[f.mn], sp[f.mx]);
-    else if (f.tipo === 'livre') s = rec[f.k] == null || rec[f.k] === '' ? 'na' : 'free';
+    else if (f.tipo === 'livre' || f.tipo === 'calc') s = rec[f.k] == null || rec[f.k] === '' ? 'na' : 'free';
     else s = (rec[f.k] == null || rec[f.k] === '') ? ((f.txt && item[f.txt]) ? 'pend' : 'na') : textCheck(rec[f.k]);
     r[f.k] = s; if (s === 'nc') fora.push(f.k); if (s === 'pend') pend.push(f.nome);
   });
@@ -890,6 +892,7 @@ function buildTests() {
   $('testsBody').innerHTML = M.fields.map(f => {
     let inp;
     if (f.tipo === 'aprov') inp = `<select id="f_${f.k}">${f.req ? '' : '<option value="">Não aplicável</option>'}<option>OK</option><option>NÃO OK</option></select>`;
+    else if (f.tipo === 'calc') inp = `<input type="text" id="f_${f.k}" class="mono" readonly tabindex="-1" placeholder="calculado" style="background:var(--soft)">`;
     else inp = `<input type="text" id="f_${f.k}" inputmode="decimal">`;
     return `<tr data-p="${f.k}"><td class="pname">${esc(f.nome)}${f.unit ? ` <span class="unit">${esc(f.unit)}</span>` : ''}</td><td class="c-in">${inp}</td><td class="spec" id="s_${f.k}"></td><td class="c-st" id="c_${f.k}"></td></tr>`;
   }).join('');
@@ -900,7 +903,8 @@ function formRec() {
   const r = { data: F.data.value, produto: normNome(F.produto.value), lote: F.lote.value.trim(), [M.aux.k]: M.aux.k === 'fornecedor' ? normNome(F.aux.value) : F.aux.value.trim(),
     situacao: S.situacao || '', rnc: F.rnc.value.trim(), rncStatus: F.rncStatus.value, analista: normNome(F.analista.value), obs: F.obs.value.trim(),
     extras: readExtras(), spec: p ? specSnap(p) : null };
-  M.fields.forEach(f => { const el = fin(f.k); if (!el) return; r[f.k] = f.tipo === 'aprov' ? el.value : parseNum(el.value); });
+  M.fields.forEach(f => { const el = fin(f.k); if (!el) return; r[f.k] = f.tipo === 'aprov' ? el.value : f.tipo === 'calc' ? null : parseNum(el.value); });
+  M.fields.forEach(f => { if (f.tipo === 'calc') r[f.k] = f.calc(r); });
   if (M.laudo) { r.laudo = S.laudo || null; r.laudosAnteriores = (S.laudosAnt || []).slice(); }
   if (M.validade) r.validade = $('fValidade').value || '';
   if (M.key === 'pa') { r.destino = $('fDestino').value || ''; r.cliente = r.destino === 'cliente' ? normNome($('fCliente').value) : ''; }
@@ -957,6 +961,7 @@ function refreshForm() {
     let s = '';
     if (f.tipo === 'faixa') s = rangeTxt(sp[f.mn], sp[f.mx]) + (f.copo && sp[f.copo] ? `<small>${esc(sp[f.copo])}</small>` : '') + (f.ftxt && sp[f.ftxt] ? `<small>${esc(sp[f.ftxt])}</small>` : '');
     else if (f.tipo === 'livre') s = sp[f.txt] ? esc(sp[f.txt]) : '<small>Sem especificação</small>';
+    else if (f.tipo === 'calc') { s = `<small>${esc(f.hint)}</small>`; fin(f.k).value = rec[f.k] == null ? '' : fmt(rec[f.k]); }
     else s = `<small>${esc((f.txt && sp[f.txt]) || f.hint || 'Sem descrição')}</small>`;
     $('s_' + f.k).innerHTML = s;
     $('c_' + f.k).innerHTML = chip(ev[f.k]); $('c_' + f.k).closest('tr').classList.toggle('dim', ev[f.k] === 'na');
@@ -1016,7 +1021,8 @@ const coll = (kind, mes, mod = M) => kind === 'meses' ? `${mod.col.meses}/${mes}
 function allRecs(mes, mod = M) {
   const d = D[mod.key];
   if (mes === 'ALL') return allMonths(mod).flatMap(m => allRecs(m, mod));
-  return [...(d.arquivo.get(mes) || []).map((r, i) => ({ ...r, _src: 'arquivo', _id: mes + ':a' + i, _mes: mes })), ...(d.live.get(mes) || []).map(r => ({ ...r, _src: 'live', _id: mes + ':' + r.id, _mes: mes }))];
+  const calc = mod.fields.filter(f => f.tipo === 'calc'); const cx = (r) => { calc.forEach(f => { if (r[f.k] == null) r[f.k] = f.calc(r); }); return r; };
+  return [...(d.arquivo.get(mes) || []).map((r, i) => cx({ ...r, _src: 'arquivo', _id: mes + ':a' + i, _mes: mes })), ...(d.live.get(mes) || []).map(r => cx({ ...r, _src: 'live', _id: mes + ':' + r.id, _mes: mes }))];
 }
 
 $('relForm').addEventListener('submit', async (e) => {
