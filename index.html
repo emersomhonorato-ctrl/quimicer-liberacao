@@ -424,6 +424,18 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       <div class="hd"><span class="label">Liberações mês a mês</span><span class="src">Clique em um mês para ver os lotes</span></div>
       <div class="bd" style="padding-top:6px;overflow-x:auto"><table class="rtab"><thead><tr><th>Mês</th><th>Lotes liberados</th><th>Aprovados</th><th>Retidos / reprovados</th><th>Aprovados fora da especificação</th></tr></thead><tbody id="resumoBody"><tr><td colspan="5" class="empty">Carregando…</td></tr></tbody></table></div>
     </div>
+    <div class="panel" id="perdaPanel" hidden>
+      <div class="hd"><span class="label">Perda na reação mês a mês</span><span class="src">Lotes com peso inicial e final</span></div>
+      <div class="bd" style="padding-top:6px">
+        <div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">
+          <div class="field" style="min-width:240px"><label for="pdProd">Produto</label><select id="pdProd"><option value="">Todos os produtos</option></select></div>
+          <div class="field"><label for="pdGrp">Mostrar</label><select id="pdGrp"><option value="mes">Total por mês</option><option value="prod">Por produto em cada mês</option></select></div>
+          <button class="btn small primary" type="button" id="pdPdf">Relatório PDF</button><button class="btn small" type="button" id="pdXls">Excel</button>
+        </div>
+        <div style="overflow-x:auto;max-height:420px"><table class="rtab"><thead><tr><th>Mês</th><th>Produto</th><th>Lotes</th><th>Peso inicial (kg)</th><th>Peso final (kg)</th><th>Perda (kg)</th><th>Perda ponderada</th><th>Mínima</th><th>Máxima</th></tr></thead><tbody id="perdaBody"></tbody></table></div>
+        <p class="src" style="margin:6px 0 0">Perda ponderada = (soma do peso inicial − soma do peso final) ÷ soma do peso inicial. Mínima e máxima são dos lotes individuais.</p>
+      </div>
+    </div>
     <div class="toolbar">
       <div class="field"><label for="rMes">Mês</label><select id="rMes"></select></div>
       <div class="field grow"><label for="rBusca" id="lBusca">Buscar produto, lote ou analista</label><input type="search" id="rBusca"></div>
@@ -1160,6 +1172,96 @@ function renderResumo() {
     <td class="num">${c(r, r.ap)}</td><td class="num">${c(r, r.ret)}</td><td class="num ${r.fora ? 'warnnum' : ''}">${c(r, r.fora)}</td></tr>`).join('')
     + `<tr class="tot" data-m="ALL"><td>Total</td><td class="num">${tot.n}</td><td class="num">${tot.ap}</td><td class="num">${tot.ret}</td><td class="num ${tot.fora ? 'warnnum' : ''}">${tot.fora}</td></tr>`;
 }
+/* ---------- perda na reação mês a mês (formulários com peso inicial e final) ---------- */
+const temPerda = (mod = M) => mod.fields.some(f => f.k === 'perda');
+function dadosPerda(mod = M) {
+  const prod = $('pdProd').value, grp = $('pdGrp').value, d = D[mod.key]; const out = [];
+  allMonths(mod).slice().reverse().forEach(m => {
+    const ld = !d.arquivoMeses.includes(m) || d.arquivo.get(m) != null;
+    const recs = allRecs(m, mod).filter(r => r.perda != null && (!prod || normNome(r.produto) === prod));
+    const agg = (l) => { const ini = l.reduce((a, r) => a + parseNum(r.pesoIni), 0), fin = l.reduce((a, r) => a + parseNum(r.pesoFin), 0), ps = l.map(r => r.perda);
+      return { n: l.length, ini, fin, kg: ini - fin, pond: ini > 0 ? (ini - fin) / ini * 100 : null, media: ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null, min: ps.length ? Math.min(...ps) : null, max: ps.length ? Math.max(...ps) : null }; };
+    if (grp === 'prod' && !prod) {
+      const by = new Map(); recs.forEach(r => { const k = normNome(r.produto); if (!by.has(k)) by.set(k, []); by.get(k).push(r); });
+      [...by.entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt')).forEach(([k, l]) => out.push({ m, produto: k, ld, ...agg(l) }));
+      if (by.size) out.push({ m, produto: 'Total do mês', sub: true, ld, ...agg(recs) });
+    } else if (recs.length || !ld) out.push({ m, produto: prod || 'Todos os produtos', ld, ...agg(recs) });
+  });
+  return out;
+}
+function renderPerda() {
+  const box = $('perdaPanel'); box.hidden = !temPerda(); if (box.hidden) return;
+  if (S.db && !st().perdaAll) { st().perdaAll = true; setTimeout(() => ensureAll(M), 0); }
+  const sel = $('pdProd'), cur = sel.value;
+  const nomes = [...new Set(allRecs('ALL').filter(r => r.perda != null).map(r => normNome(r.produto)))].sort((a, b) => a.localeCompare(b, 'pt'));
+  const html = '<option value="">Todos os produtos</option>' + nomes.map(n => `<option value="${esc(n)}"${n === cur ? ' selected' : ''}>${esc(n)}</option>`).join('');
+  if (sel.dataset.h !== html) { sel.innerHTML = html; sel.dataset.h = html; }
+  $('pdGrp').disabled = !!sel.value;
+  const p = (v) => v == null ? '—' : fmt(Math.round(v * 100) / 100) + ' %', kg = (v) => fmt(Math.round(v * 10) / 10);
+  const rows = dadosPerda();
+  $('perdaBody').innerHTML = rows.map(r => `<tr class="${r.sub ? 'tot' : ''}"><td>${mesLabel(r.m)}</td><td>${esc(r.produto)}</td>${!r.ld ? '<td colspan="7" class="src">carregando…</td>' : `<td class="num">${r.n}</td><td class="num">${kg(r.ini)}</td><td class="num">${kg(r.fin)}</td><td class="num">${kg(r.kg)}</td><td class="num"><b>${p(r.pond)}</b></td><td class="num">${p(r.min)}</td><td class="num">${p(r.max)}</td>`}</tr>`).join('')
+    || '<tr><td colspan="9" class="empty">Nenhum lote com peso inicial e final.</td></tr>';
+}
+['pdProd', 'pdGrp'].forEach(id => $(id).addEventListener('change', renderPerda));
+function pdfPerda() {
+  const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const X = 12, W = 186, TEAL = [33, 89, 104], LBLUE = [197, 217, 241];
+  const prod = $('pdProd').value, grp = prod ? 'mes' : $('pdGrp').value;
+  const rows = dadosPerda().filter(r => r.ld);
+  const quem = ACC.me?.nome || '';
+  const meses = rows.map(r => r.m); const per = meses.length ? `${mesLabel(meses[meses.length - 1])} a ${mesLabel(meses[0])}` : '—';
+  const cab = () => {
+    doc.setDrawColor(0); doc.setLineWidth(0.3); doc.setTextColor(0);
+    doc.rect(X, 8, W, 20); doc.line(X + 52, 8, X + 52, 28);
+    doc.addImage(LOGO, 'JPEG', X + 9, 9.5, 31, 17);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text('RELATÓRIO DE PERDA NA REAÇÃO', X + 52 + (W - 52) / 2, 16.5, { align: 'center' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text(`${codeOf(M)} · ${M.title}`, X + 52 + (W - 52) / 2, 23, { align: 'center' });
+    const cw = [62, 62, 62], lb = ['Período', 'Produto', 'Emitido em'], vv = [per, prod || 'Todos os produtos', `${dataBR(hoje())}${quem ? ' · ' + quem : ''}`];
+    let x = X; lb.forEach((t, i) => { doc.rect(x, 28, cw[i], 5); doc.rect(x, 33, cw[i], 6); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.text(t, x + cw[i] / 2, 31.6, { align: 'center' }); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text(doc.splitTextToSize(vv[i], cw[i] - 3)[0], x + cw[i] / 2, 37.2, { align: 'center' }); x += cw[i]; });
+    return 45;
+  };
+  const cols = [{ t: 'Mês', w: 24 }, { t: 'Produto', w: 50, al: 'left' }, { t: 'Lotes', w: 12 }, { t: 'Peso inicial (kg)', w: 20 }, { t: 'Peso final (kg)', w: 20 }, { t: 'Perda (kg)', w: 16 }, { t: 'Perda ponderada', w: 18 }, { t: 'Mínima', w: 13 }, { t: 'Máxima', w: 13 }];
+  const head = (y) => { let x = X; doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); cols.forEach(c => { doc.setFillColor(...TEAL); doc.rect(x, y, c.w, 9, 'FD'); doc.setTextColor(255); doc.text(doc.splitTextToSize(c.t, c.w - 2), x + c.w / 2, y + 3.8, { align: 'center' }); x += c.w; }); doc.setTextColor(0); doc.setFont('helvetica', 'normal'); return y + 9; };
+  const p = (v) => v == null ? '—' : fmt(Math.round(v * 100) / 100) + ' %', kg = (v) => fmt(Math.round(v * 10) / 10);
+  let y = head(cab());
+  const totIni = rows.filter(r => !r.sub).reduce((a, r) => a + r.ini, 0), totFin = rows.filter(r => !r.sub).reduce((a, r) => a + r.fin, 0), totN = rows.filter(r => !r.sub).reduce((a, r) => a + r.n, 0);
+  const all = rows.concat(rows.length ? [{ m: null, produto: 'TOTAL DO PERÍODO', n: totN, ini: totIni, fin: totFin, kg: totIni - totFin, pond: totIni > 0 ? (totIni - totFin) / totIni * 100 : null, min: Math.min(...rows.filter(r => !r.sub).map(r => r.min ?? Infinity)), max: Math.max(...rows.filter(r => !r.sub).map(r => r.max ?? -Infinity)), sub: true, fim: true }] : []);
+  doc.setFontSize(8);
+  all.forEach(r => {
+    const vals = [r.m ? mesLabel(r.m) : '', r.produto, String(r.n), kg(r.ini), kg(r.fin), kg(r.kg), p(r.pond), p(isFinite(r.min) ? r.min : null), p(isFinite(r.max) ? r.max : null)];
+    const ln = doc.splitTextToSize(vals[1], cols[1].w - 3); const h = Math.max(6, 2.5 + ln.length * 3.6);
+    if (y + h > 280) { doc.addPage(); y = head(cab()); doc.setFontSize(8); }
+    let x = X; doc.setFont('helvetica', r.sub ? 'bold' : 'normal');
+    if (r.sub) { doc.setFillColor(...LBLUE); doc.rect(X, y, W, h, 'F'); }
+    cols.forEach((c, i) => { doc.rect(x, y, c.w, h); const t = i === 1 ? ln : [vals[i]]; doc.text(t, c.al === 'left' ? x + 1.5 : x + c.w / 2, y + 4, c.al === 'left' ? undefined : { align: 'center' }); x += c.w; });
+    y += h;
+  });
+  if (!rows.length) { doc.text('Nenhum lote com peso inicial e final no período.', X, y + 6); }
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+  const ny = Math.min(y + 6, 284); doc.text('Perda = (peso inicial - peso final) ÷ peso inicial × 100. Perda ponderada = (soma dos pesos iniciais - soma dos pesos finais) ÷ soma dos pesos iniciais. Mínima e máxima referem-se aos lotes individuais.', X, ny, { maxWidth: W });
+  const np = doc.getNumberOfPages();
+  for (let i = 1; i <= np; i++) { doc.setPage(i); doc.setFontSize(7); doc.text(`Página ${i}/${np}`, X + W, 292, { align: 'right' }); doc.text('Quimicer Indústria e Comércio de Produtos Químicos Ltda.', X, 292); }
+  return doc.output('arraybuffer');
+}
+$('pdPdf').addEventListener('click', async () => {
+  if (!window.jspdf) { toast('O gerador de PDF não carregou. Recarregue a página.'); return; }
+  if (!S.downloads) { toast('Download indisponível nesta visualização.'); return; }
+  try { await S.downloads.save({ filename: `${frOf(M).replace(' ', '_')}_Relatorio_perda_${$('pdProd').value ? slug($('pdProd').value) + '_' : ''}${hoje()}.pdf`, data: pdfPerda() }); }
+  catch (x) { if (x?.code !== 'declined') { console.warn(x); toast('Não foi possível gerar o PDF.'); } }
+});
+
+$('pdXls').addEventListener('click', async () => {
+  if (!S.downloads) { toast('Download indisponível nesta visualização.'); return; }
+  let X; try { X = await loadXlsx(); } catch { toast('Não foi possível carregar o gerador de Excel.'); return; }
+  const r2 = (v) => v == null ? '' : Math.round(v * 100) / 100;
+  const rows = dadosPerda().filter(r => r.ld).map(r => [mesLabel(r.m), r.produto, r.n, r2(r.ini), r2(r.fin), r2(r.kg), r2(r.pond), r2(r.media), r2(r.min), r2(r.max)]);
+  const ws = X.utils.aoa_to_sheet([[`${codeOf(M)} · Perda na reação por mês`], [`Perda ponderada = (soma peso inicial − soma peso final) ÷ soma peso inicial · gerado em ${dataBR(hoje())}`], [],
+    ['Mês', 'Produto', 'Lotes', 'Peso inicial (kg)', 'Peso final (kg)', 'Perda (kg)', 'Perda ponderada (%)', 'Perda média (%)', 'Perda mínima (%)', 'Perda máxima (%)'], ...rows]);
+  ws['!cols'] = [{ wch: 16 }, { wch: 34 }, { wch: 7 }, { wch: 15 }, { wch: 15 }, { wch: 11 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
+  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Perda mensal');
+  try { await S.downloads.save({ filename: `${frOf(M).replace(' ', '_')}_perda_mensal_${hoje()}.xlsx`, data: new Blob([X.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) }); }
+  catch (x) { if (x?.code !== 'declined') toast('Não foi possível gerar o arquivo.'); }
+});
 $('resumoBody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-m]'); if (!tr) return; st().rMes = tr.dataset.m; st().statFilter = ''; monthOptions(); renderRegistros(); $('rMes').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 
 function exCell(r, ev) {
@@ -1173,7 +1275,7 @@ function laudoCell(r) {
   return '<td class="v na">—</td>';
 }
 function renderRegistros() {
-  renderResumo();
+  renderResumo(); renderPerda();
   const d = st(), mes = d.rMes;
   const all = allRecs(mes);
   const loading = S.db && (mes === 'ALL' ? d.arquivoMeses.some(m => d.arquivo.get(m) == null) : (d.arquivo.get(mes) == null && d.arquivoMeses.includes(mes)));
