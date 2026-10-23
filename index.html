@@ -447,7 +447,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
     </div>
     <div class="stats" id="stats"></div>
     <div class="tablebox"><table class="grid" id="rTable"><thead id="rHead"></thead><tbody id="rBody"></tbody></table></div>
-    <div class="foot"><span id="rCount"></span><span>Valores em vermelho estão fora da especificação vigente na data do registro.</span></div>
+    <div class="foot"><span id="rCount"></span><span>Valores em vermelho estão fora da especificação atual. Quando a especificação muda, as liberações são reavaliadas automaticamente.</span></div>
   </section>
 
   <!-- LAUDOS -->
@@ -890,10 +890,18 @@ function setModule(key, user) {
 }
 
 /* ---------- spec logic ---------- */
+// sempre avalia pela especificação ATUAL do item; a cópia gravada na liberação (rec.spec) fica como histórico
+const SPECC = new WeakMap();
 function specOf(rec, mod = M) {
-  if (rec && rec.spec) return rec.spec;
-  const p = D[mod.key].itens.get(slug(normNome(rec?.produto)));
-  return p ? specSnap(p, mod) : null;
+  const p = rec ? D[mod.key].itens.get(slug(normNome(rec.produto))) : null;
+  if (p) { let s = SPECC.get(p); if (!s) { s = specSnap(p, mod); SPECC.set(p, s); } return s; }
+  return (rec && rec.spec) || null;
+}
+function specOriginalTxt(r, mod = M) {
+  const o = r.spec, a = specOf(r, mod); if (!o || !a || o === a) return '';
+  const fx = mod.fields.filter(f => f.tipo === 'faixa'), dif = fx.filter(f => (o[f.mn] ?? null) !== (a[f.mn] ?? null) || (o[f.mx] ?? null) !== (a[f.mx] ?? null));
+  if (!dif.length) return '';
+  return dif.map(f => `${f.nome} ${o[f.mn] == null && o[f.mx] == null ? 'sem limite' : fmt(o[f.mn]) + ' – ' + fmt(o[f.mx])}`).join(' · ');
 }
 const isBrook = (p) => (p && p.viscTipo) === 'brookfield';
 const viscUnit = (p) => isBrook(p) ? 'cP' : 's';
@@ -1375,6 +1383,7 @@ function openRec(r) {
     + (r[M.aux.k] ? `<dt>${esc(M.aux.label)}</dt><dd>${esc(r[M.aux.k])}</dd>` : '')
     + M.fields.map(line).join('')
     + (sp.extras || []).map(e => `<dt>${esc(e.nome)}</dt><dd><span class="num">${shown(r.extras?.[e.id])}</span>${e.unidade && e.tipo !== 'aprovacao' ? ' ' + esc(e.unidade) : ''} <span class="src">(${extraRange(e)})</span> ${chip(ev.x[e.id])}</dd>`).join('')
+    + (specOriginalTxt(r) ? `<dt>Especificação na data da liberação</dt><dd class="src">${esc(specOriginalTxt(r))} <br>(a avaliação acima usa a especificação atual)</dd>` : '')
     + (r.rnc || r.rncStatus ? `<dt>RNC</dt><dd class="mono">${esc(r.rnc || '—')} ${esc(r.rncStatus || '')}</dd>` : '') + rncFicha(r)
     + (M.key === 'pa' && (r.destino || r.cliente) ? `<dt>Destino</dt><dd>${r.cliente ? 'Cliente: ' + esc(r.cliente) : 'Estoque'}</dd>` : '')
     + `<dt>Analisado por</dt><dd>${esc(r.analista || '—')}</dd>` + (M.laudo ? `<dt>Laudo</dt><dd>${laudo}</dd>` : '') + (M.key === 'pa' ? rastreio(r) : '') + `<dt>Observação</dt><dd>${esc(r.obs || '—')}</dd>`
