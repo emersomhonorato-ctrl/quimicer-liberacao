@@ -716,10 +716,10 @@ const MODS = {
     aux: { k: 'op', label: 'Ordem de produção', ph: 'opcional', mono: true, col: false }, lotePh: '103524', obsPh: 'Ex.: defloculação OK',
     fields: [F_DENS, F_PH, F_VISC,
       { k: 'umid', nome: 'Umidade', short: 'Umid.', unit: '%', tipo: 'livre', txt: 'umidade' },
-      { k: 'imperm', nome: 'Impermeabilidade', short: 'Imperm.', tipo: 'aprov', hint: 'Teste de aplicação' },
+      { k: 'imperm', nome: 'Impermeabilidade', short: 'Imperm.', tipo: 'aprov', txt: 'diluicao', txtPre: 'Diluição para o teste: ', hint: 'Teste de aplicação' },
       { k: 'colagem', nome: 'Colagem', short: 'Colagem', tipo: 'aprov', txt: 'colagem', hint: 'Teste de aplicação' },
       { k: 'aparencia', nome: 'Aparência', short: 'Aparência', unit: 'visual', tipo: 'aprov', txt: 'visual', def: 'OK', req: true }],
-    specText: [{ k: 'visual', label: 'Aparência esperada', full: true, ph: 'Ex.: Líquido leitoso' }, { k: 'colagem', label: 'Teste de colagem' }, { k: 'umidade', label: 'Umidade' }],
+    specText: [{ k: 'visual', label: 'Aparência esperada', full: true, ph: 'Ex.: Líquido leitoso' }, { k: 'colagem', label: 'Teste de colagem' }, { k: 'umidade', label: 'Umidade' }, { k: 'diluicao', label: 'Diluição p/ teste de impermeabilização', ph: 'Ex.: 1:10 em água ou 10%' }],
     laudo: false, codigo: false, csv: 'FR002', docs: true,
   },
   pi: {
@@ -833,6 +833,7 @@ function viscMetodo(p) { if (!p) return ''; if (isBrook(p)) return ['Brookfield'
 function specSnap(p, mod = M) {
   const o = { extras: p.extras || [] };
   if (p.viscTipo) { o.viscTipo = p.viscTipo; o.viscCopo = p.viscCopo || null; }
+  if (p.diluicao) o.diluicao = p.diluicao;
   mod.fields.filter(f => f.tipo === 'faixa').forEach(f => { o[f.mn] = p[f.mn] ?? null; o[f.mx] = p[f.mx] ?? null; });
   return o;
 }
@@ -962,7 +963,7 @@ function refreshForm() {
     if (f.tipo === 'faixa') s = rangeTxt(sp[f.mn], sp[f.mx]) + (f.copo && sp[f.copo] ? `<small>${esc(sp[f.copo])}</small>` : '') + (f.ftxt && sp[f.ftxt] ? `<small>${esc(sp[f.ftxt])}</small>` : '');
     else if (f.tipo === 'livre') s = sp[f.txt] ? esc(sp[f.txt]) : '<small>Sem especificação</small>';
     else if (f.tipo === 'calc') { s = `<small>${esc(f.hint)}</small>`; fin(f.k).value = rec[f.k] == null ? '' : fmt(rec[f.k]); }
-    else s = `<small>${esc((f.txt && sp[f.txt]) || f.hint || 'Sem descrição')}</small>`;
+    else s = (f.txtPre && f.txt && sp[f.txt]) ? `<b>${esc(f.txtPre + sp[f.txt])}</b>` : `<small>${esc((f.txt && sp[f.txt]) || f.hint || 'Sem descrição')}</small>`;
     $('s_' + f.k).innerHTML = s;
     $('c_' + f.k).innerHTML = chip(ev[f.k]); $('c_' + f.k).closest('tr').classList.toggle('dim', ev[f.k] === 'na');
   });
@@ -1751,7 +1752,7 @@ function espColunas(k) {
     { g: 'VISCOSIDADE (s) / BF (cP)', s: 'Equip.', w: 36, v: equip, cinza: true }, { g: 'VISCOSIDADE (s) / BF (cP)', s: 'Min.', w: 40, v: p => na(p.viscMin) }, { g: 'VISCOSIDADE (s) / BF (cP)', s: 'Max.', w: 40, v: p => na(p.viscMax) },
     { g: 'p.H', s: 'Min.', w: 36, v: p => na(p.phMin) }, { g: 'p.H', s: 'Max.', w: 36, v: p => na(p.phMax) },
     { g: 'ANÁLISE VISUAL', w: 170, v: p => txt(p.visual) },
-    { g: 'TESTE ESPECÍFICOS, conf. ensaios na IT 001', w: 122, v: p => testes(p, [p.colagem, p.umidade ? 'Umidade ' + p.umidade : '']) }];
+    { g: 'TESTE ESPECÍFICOS, conf. ensaios na IT 001', w: 122, v: p => testes(p, [p.colagem, p.umidade ? 'Umidade ' + p.umidade : '', p.diluicao ? 'T. Impermeabilizante (diluição ' + p.diluicao + ')' : '']) }];
   if (k === 'mp') return [
     { g: 'Código MP', w: 70, v: p => txt(p.codigo) }, { g: 'Matéria Prima (Nome Usual)', w: 120, v: p => p.nome },
     { g: 'Densidade (g/cm3)', s: 'Min.', w: 60, v: p => na(p.densMin) }, { g: 'Densidade (g/cm3)', s: 'Max.', w: 60, v: p => na(p.densMax) },
@@ -2284,7 +2285,7 @@ function pickLaudoRec(r) {
   if (r.visc != null) { const vp = sp.viscTipo ? sp : item; add(`VISCOSIDADE${(vp.viscCopo || item.viscCopo) ? ' ' + (vp.viscCopo || item.viscCopo).toUpperCase() : ''} (${viscUnit(vp)})`, faixaTxt(sp.viscMin, sp.viscMax), resTxt(r.visc), true); }
   if (r.umid != null) add('UMIDADE (%)', item.umidade || '-', resTxt(r.umid), true);
   (sp.extras || []).forEach(e => { const v = r.extras?.[e.id]; if (v != null && v !== '') add(e.nome.toUpperCase() + (e.unidade && e.tipo !== 'aprovacao' ? ` (${e.unidade})` : ''), e.tipo === 'aprovacao' ? (e.descricao || '-') : faixaTxt(e.min, e.max), resTxt(v), true); });
-  if (r.imperm) add('TESTE DE IMPERMEABILIDADE', '-', resTxt(r.imperm), false);
+  if (r.imperm) { const dil = sp.diluicao || item.diluicao; add('TESTE DE IMPERMEABILIDADE' + (dil ? ` (DILUIÇÃO ${String(dil).toUpperCase()})` : ''), '-', resTxt(r.imperm), false); }
   if (r.colagem) add('TESTE DE COLAGEM', item.colagem || '-', resTxt(r.colagem), false);
   add('ASPECTO VISUAL', (item.visual || '-').toUpperCase(), resTxt(r.aparencia || 'OK'), false);
   LZ.ens = ens;
