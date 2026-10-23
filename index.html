@@ -422,7 +422,9 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       <div class="field"><label for="rMes">Mês</label><select id="rMes"></select></div>
       <div class="field grow"><label for="rBusca" id="lBusca">Buscar produto, lote ou analista</label><input type="search" id="rBusca"></div>
       <div class="field"><label for="rSit">Situação</label><select id="rSit"><option value="">Todas</option><option>APROVADO</option><option>RETIDO</option><option>REPROVADO</option></select></div>
-      <button class="btn" id="rExport" type="button">Exportar CSV</button>
+      <button class="btn" id="rExportXls" type="button">Exportar Excel</button>
+      <button class="btn" id="rExportTodas" type="button" title="Baixa um arquivo Excel para cada formulário: FR 001, FR 002 e FR 011">Exportar as 3 FR</button>
+      <button class="btn" id="rExport" type="button">CSV</button>
     </div>
     <div class="stats" id="stats"></div>
     <div class="tablebox"><table class="grid" id="rTable"><thead id="rHead"></thead><tbody id="rBody"></tbody></table></div>
@@ -592,6 +594,11 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       </div>
       <div class="err" id="cvErr" hidden></div>
       <div style="overflow-x:auto;margin-top:8px"><table class="acc"><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Situação</th><th></th></tr></thead><tbody id="cvBody"></tbody></table></div>
+    </div>
+    <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">
+      <div class="label" style="margin-bottom:4px">Backup</div>
+      <p class="src" style="margin:0 0 8px">O sistema faz um backup automático todo dia às 3h e guarda os últimos 30 dias. Use o botão para baixar uma cópia completa dos dados (registros, especificações, laudos, revisões da ESP, usuários) e guardar no seu computador ou na rede. Os PDFs ficam listados no backup, mas não vão dentro do arquivo.</p>
+      <div class="row" style="gap:8px;align-items:center"><button type="button" class="btn small" id="bkBtn">Baixar backup agora</button><span class="src" id="bkMsg"></span></div>
     </div>
     <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">
       <div class="label" style="margin-bottom:4px">Importar dados do app antigo</div>
@@ -1513,6 +1520,68 @@ function loadXlsx() {
   XLSXP = new Promise((ok, err) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload = () => ok(window.XLSX); sc.onerror = () => { XLSXP = null; err(new Error('xlsx')); }; document.head.appendChild(sc); });
   return XLSXP;
 }
+/* ---------- exportar as planilhas FR 001 / FR 002 / FR 011 em Excel ---------- */
+async function carregarTudo(mod) {
+  await startModule(mod.key); ensureAll(mod);
+  const d = D[mod.key], t0 = Date.now();
+  while (Date.now() - t0 < 40000) {
+    if (d.arquivoMeses.length === 0 && Date.now() - t0 < 3000) { await new Promise(r => setTimeout(r, 300)); continue; }
+    const ok = d.loaded && d.arquivoMeses.every(m => Array.isArray(d.arquivo.get(m))) && allMonths(mod).every(m => d.live.has(m));
+    if (ok) return true;
+    ensureAll(mod); await new Promise(r => setTimeout(r, 400));
+  }
+  return false;
+}
+function planilhaFR(X, mod) {
+  const AV = { ok: 'CONFORME', nc: 'N/C', na: 'N/A', pend: 'NÃO AVALIADO', free: '' };
+  const num = (v) => v == null || v === '' ? '' : v;
+  const cols = ['Data', mod.itemCol, 'Lote', mod.aux.label].concat(mod.validade ? ['Validade', 'Situação da validade'] : []);
+  mod.fields.forEach(f => { const u = f.unit && f.tipo !== 'aprov' ? ` (${f.k === 'visc' ? 's ou cP' : f.unit})` : ''; if (f.tipo === 'faixa') cols.push(f.nome + u, f.nome + ' mín', f.nome + ' máx', f.nome + ' avaliação'); else cols.push(f.nome + u); });
+  cols.push('Outros ensaios', 'Situação', 'Fora da especificação', 'Nº RNC', 'Status da RNC', 'Analisado por', 'Observação', 'Origem'); if (mod.laudo) cols.push('Laudo');
+  const linha = (r) => {
+    const ev = evalRec(r, mod), sp = specOf(r, mod) || {};
+    const v = [r.data ? new Date(r.data + 'T12:00:00') : '', r.produto || '', r.lote || '', r[mod.aux.k] || ''];
+    if (mod.validade) { const li = lotInfo(r); v.push(li.validade ? new Date(li.validade + 'T12:00:00') : '', VSTAT[li.st]?.[1] || ''); }
+    mod.fields.forEach(f => { if (f.tipo === 'faixa') v.push(num(r[f.k]), num(sp[f.mn]), num(sp[f.mx]), AV[ev[f.k]] || ''); else v.push(num(r[f.k])); });
+    v.push((sp.extras || []).map(e => `${e.nome}=${r.extras?.[e.id] == null ? '-' : (typeof r.extras[e.id] === 'number' ? fmt(r.extras[e.id]) : r.extras[e.id])}${e.unidade && e.tipo !== 'aprovacao' ? ' ' + e.unidade : ''} [${AV[ev.x[e.id]] || ''}]`).join(' | '),
+      r.situacao || '', (ev.fora || []).join(', '), r.rnc || '', r.rncStatus || '', r.analista || '', r.obs || '',
+      r._src === 'arquivo' ? `Planilha${r.editadoNoApp ? ' (editado no app)' : ''}` : 'App');
+    if (mod.laudo) v.push(r.laudo?.nome || r.laudoRef || '');
+    return v;
+  };
+  const ordem = (a, b) => (a.data || '').localeCompare(b.data || '') || String(a.lote).localeCompare(String(b.lote), 'pt', { numeric: true });
+  const titulo = `${codeOf(mod)} · ${mod.title}`;
+  const folha = (recs, sub) => {
+    const ws = X.utils.aoa_to_sheet([[titulo], [sub], [], cols, ...recs.map(linha)], { cellDates: true });
+    ws['!cols'] = cols.map((c, i) => ({ wch: i === 1 ? 34 : /Observação|Outros|Laudo/.test(c) ? 40 : Math.max(9, Math.min(22, c.length + 2)) }));
+    ws['!autofilter'] = { ref: X.utils.encode_range({ s: { r: 3, c: 0 }, e: { r: 3 + Math.max(recs.length, 1), c: cols.length - 1 } }) };
+    const rg = X.utils.decode_range(ws['!ref']);
+    for (let R = 4; R <= rg.e.r; R++) for (const C of [0].concat(mod.validade ? [4] : [])) { const c = ws[X.utils.encode_cell({ r: R, c: C })]; if (c && c.t === 'd') c.z = 'dd/mm/yyyy'; }
+    return ws;
+  };
+  const wb = X.utils.book_new(); const todos = allRecs('ALL', mod).sort(ordem);
+  const quem = ACC.me?.nome || '';
+  X.utils.book_append_sheet(wb, folha(todos, `Todos os meses · ${todos.length} lotes · exportado em ${dataBR(hoje())}${quem ? ' por ' + quem : ''}`), 'Todos');
+  allMonths(mod).slice().reverse().forEach(m => { const l = allRecs(m, mod).sort(ordem); if (l.length) X.utils.book_append_sheet(wb, folha(l, `${mesLabel(m)} · ${l.length} lotes`), mesLabel(m).toUpperCase().slice(0, 31)); });
+  wb.Props = { Title: titulo, Author: 'Quimicer' };
+  return { nome: `${frOf(mod).replace(' ', '_')}_${slug(mod.title)}_${hoje()}.xlsx`, data: new Blob([X.write(wb, { type: 'array', bookType: 'xlsx', cellDates: true })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) };
+}
+async function exportarFR(keys, btn) {
+  if (!S.downloads) { toast('Download indisponível nesta visualização.'); return; }
+  let X; try { X = await loadXlsx(); } catch { toast('Não foi possível carregar o gerador de Excel. Verifique a internet.'); return; }
+  const txt = btn.textContent; btn.disabled = true;
+  try {
+    for (const k of keys) {
+      const mod = MODS[k]; btn.textContent = `Preparando ${frOf(mod)}…`;
+      if (!await carregarTudo(mod)) { toast(`Os registros da ${frOf(mod)} ainda não carregaram. Tente de novo.`); continue; }
+      const r = planilhaFR(X, mod);
+      try { await S.downloads.save({ filename: r.nome, data: r.data }); } catch (x) { if (x?.code === 'declined') break; throw x; }
+    }
+  } catch (x) { console.warn(x); toast('Não foi possível gerar a planilha.'); }
+  finally { btn.disabled = false; btn.textContent = txt; }
+}
+$('rExportXls').addEventListener('click', () => exportarFR([M.key], $('rExportXls')));
+$('rExportTodas').addEventListener('click', () => exportarFR(['mp', 'pa', 'pi'], $('rExportTodas')));
 async function gerarExcelEsp() {
   if (!S.downloads) { toast('Download indisponível nesta visualização.'); return; }
   const d = D[M.key]; if (!d.loaded) { toast('Aguarde as especificações carregarem.'); return; }
@@ -2650,6 +2719,16 @@ $('cvBody').addEventListener('click', async (e) => {
   if (cp) { const c = (ACC.convites || []).find(x => x.email === cp.closest('tr').dataset.email); try { await navigator.clipboard.writeText(conviteTexto(c)); toast('Convite copiado: cole no WhatsApp ou no e-mail'); } catch { toast('Não foi possível copiar.'); } return; }
   const b = e.target.closest('[data-cvdel]'); if (!b) return;
   await SB.from('convites').delete().eq('email', b.closest('tr').dataset.email); await loadConvites(); renderConvites();
+});
+$('bkBtn').addEventListener('click', async () => {
+  const msg = (t) => { $('bkMsg').textContent = t; }; $('bkBtn').disabled = true; msg('Gerando…');
+  try {
+    const { data, error } = await SB.rpc('baixar_backup'); if (error) throw error;
+    const n = (data.registros || []).length;
+    await S.downloads.save({ filename: `backup_quimicer_${hoje()}.json`, data: new Blob([JSON.stringify(data)], { type: 'application/json' }) });
+    msg(`Baixado: ${n} registros, ${(data.itens || []).length} especificações, ${(data.laudos || []).length} laudos.`);
+  } catch (x) { msg(/administrador/i.test(x?.message || '') ? 'Somente o administrador baixa o backup.' : 'Não foi possível gerar o backup.'); }
+  finally { $('bkBtn').disabled = false; }
 });
 $('impDadosBtn').addEventListener('click', () => $('impDadosFile').click());
 $('impDadosFile').addEventListener('change', async () => {
