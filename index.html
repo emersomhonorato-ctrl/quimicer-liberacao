@@ -307,7 +307,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       <a href="#laudos" data-tab="laudos" id="tabLaudos">Laudos</a>
       <a href="#validades" data-tab="validades" id="tabVal" hidden>Validades</a>
     </nav>
-    <div class="conn" id="conn"><span class="dot" id="connDot"></span><span id="connTxt">Conectando…</span><span class="perfil" id="perfilTag" hidden></span><button type="button" class="btn small" id="btnAcessos" hidden>Usuários</button><button type="button" class="btn small" id="btnInstalar" hidden>Instalar app</button><button type="button" class="btn small" id="btnSair" hidden>Sair</button></div>
+    <div class="conn" id="conn"><span class="dot" id="connDot"></span><span id="connTxt">Conectando…</span><span class="perfil" id="perfilTag" hidden></span><button type="button" class="btn small" id="btnAcessos" hidden>Usuários</button><button type="button" class="btn small" id="btnAtualizar" title="Recarrega o app com a versão mais nova e os dados atualizados">↻ Atualizar</button><button type="button" class="btn small" id="btnInstalar" hidden>Instalar app</button><button type="button" class="btn small" id="btnSair" hidden>Sair</button></div>
   </div>
 </header>
 
@@ -1071,6 +1071,11 @@ function resetForm(keepIdent) {
   refreshForm();
 }
 $('cancelEdit').addEventListener('click', () => resetForm(false));
+$('btnAtualizar').addEventListener('click', async () => {
+  const b = $('btnAtualizar'); b.disabled = true; b.textContent = 'Atualizando…';
+  try { if ('caches' in window) { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.update(); } catch {}
+  location.reload();
+});
 $('fDestino').addEventListener('change', () => { const c = $('fDestino').value === 'cliente'; $('fCliWrap').hidden = !c; if (c) { fillClientes(); $('fCliente').focus(); } });
 function fillClientes() {
   const set = new Set((LZ.all || []).map(h => h.cliente).filter(Boolean));
