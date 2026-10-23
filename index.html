@@ -921,6 +921,13 @@ function check(v, min, max) {
   if (n == null) return 'pend';
   return (n >= min - 1e-9 && n <= max + 1e-9) ? 'ok' : 'nc';
 }
+// densidade: arredondamento/truncamento na casa decimal da especificação (ex.: espec. 1,04–1,08 → 1,0849 e 1,0351 ficam conformes)
+function checkDens(v, min, max) {
+  const base = check(v, min, max); if (base !== 'nc') return base;
+  const n = parseNum(v); const dec = (x) => (String(x).split('.')[1] || '').length; const d = Math.max(dec(min), dec(max), 2), m = Math.pow(10, d);
+  const tr = Math.floor(n * m + 1e-9) / m, ro = Math.round(n * m + 1e-7) / m, ok = (x) => x >= min - 1e-9 && x <= max + 1e-9;
+  return ok(tr) || ok(ro) ? 'ok' : 'nc';
+}
 function textCheck(v) { if (v == null || v === '') return 'na'; const t = String(v).toUpperCase(); return /N[ÃA]O|NOK|REPROV/.test(t) ? 'nc' : (t === 'OK' ? 'ok' : 'free'); }
 function evalRec(rec, mod = M) {
   const sp = specOf(rec, mod) || {};
@@ -928,7 +935,7 @@ function evalRec(rec, mod = M) {
   const r = { x: {} }; const fora = [], pend = [];
   mod.fields.forEach(f => {
     let s;
-    if (f.tipo === 'faixa') s = check(rec[f.k], sp[f.mn], sp[f.mx]);
+    if (f.tipo === 'faixa') s = (f.k === 'dens' ? checkDens : check)(rec[f.k], sp[f.mn], sp[f.mx]);
     else if (f.tipo === 'livre' || f.tipo === 'calc') s = rec[f.k] == null || rec[f.k] === '' ? 'na' : 'free';
     else s = (rec[f.k] == null || rec[f.k] === '') ? ((f.txt && item[f.txt]) ? 'pend' : 'na') : textCheck(rec[f.k]);
     r[f.k] = s; if (s === 'nc') fora.push(f.k); if (s === 'pend') pend.push(f.nome);
