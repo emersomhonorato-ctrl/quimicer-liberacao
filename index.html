@@ -64,6 +64,8 @@ main { padding-block: 20px 60px }
 .panel > .bd { padding: 14px 16px 16px }
 .ident { display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr 1.2fr; gap: 12px }
 .ident.val { grid-template-columns: 2fr 1fr 1fr }
+.destrow { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; margin-top: 12px }
+@media (max-width: 700px) { .destrow { grid-template-columns: 1fr } }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0 }
 .field label { font-size: 12px; font-weight: 600; color: var(--muted) }
 input[type=text], input[type=date], input[type=search], select, textarea {
@@ -358,6 +360,10 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
               <div class="field"><label for="fData">Data</label><input type="date" id="fData"></div>
               <div class="field" id="fValWrap" hidden><label for="fValidade">Validade do lote</label><input type="date" id="fValidade"></div>
               <div class="field"><label for="fAnalista">Analisado por</label><input type="text" id="fAnalista" list="dlAnalistas" autocomplete="off"></div>
+            </div>
+            <div class="destrow" id="destRow" hidden>
+              <div class="field"><label for="fDestino">Destino do lote</label><select id="fDestino"><option value="">Não informado</option><option value="estoque">Estoque</option><option value="cliente">Cliente</option></select></div>
+              <div class="field" id="fCliWrap" hidden><label for="fCliente">Nome do cliente <span class="src">(já vai preenchido no laudo)</span></label><input type="text" id="fCliente" list="dlClientes" autocomplete="off" placeholder="Ex.: ETERNIT S.A."></div>
             </div>
             <div class="prodinfo" id="prodInfo">Escolha o item para carregar a especificação.</div>
           </div>
@@ -804,7 +810,7 @@ function setModule(key, user) {
   $('lBusca').textContent = `Buscar ${M.itemCol.toLowerCase()}, lote ou analista`; $('lPBusca').textContent = `Buscar ${M.itemCol.toLowerCase()}`;
   $('pNovo').textContent = M.novo; $('laudoPanel').hidden = !M.laudo; if (key !== 'pa' && S.tab === 'laudos') S.tab = 'liberar';
   if (key !== 'mp' && S.tab === 'validades') S.tab = 'liberar'; syncTabs();
-  $('fValWrap').hidden = !M.validade; $('identGrid').classList.toggle('val', !!M.validade);
+  $('destRow').hidden = M.key !== 'pa'; $('fValWrap').hidden = !M.validade; $('identGrid').classList.toggle('val', !!M.validade);
   $('rMes').value = st().rMes;
   S.extrasKey = null; buildTests(); resetForm(false);
   fillDatalists(); monthOptions(); renderHeads();
@@ -897,6 +903,7 @@ function formRec() {
   M.fields.forEach(f => { const el = fin(f.k); if (!el) return; r[f.k] = f.tipo === 'aprov' ? el.value : parseNum(el.value); });
   if (M.laudo) { r.laudo = S.laudo || null; r.laudosAnteriores = (S.laudosAnt || []).slice(); }
   if (M.validade) r.validade = $('fValidade').value || '';
+  if (M.key === 'pa') { r.destino = $('fDestino').value || ''; r.cliente = r.destino === 'cliente' ? normNome($('fCliente').value) : ''; }
   return r;
 }
 function readExtras() {
@@ -975,12 +982,19 @@ function resetForm(keepIdent) {
   ['produto', 'lote', 'aux', 'rnc', 'obs'].forEach(k => F[k].value = '');
   F.rncStatus.value = '';
   M.fields.forEach(f => { const el = fin(f.k); if (el) el.value = f.tipo === 'aprov' ? (f.def || '') : ''; });
-  $('fValidade').value = ''; S.laudosAnt = [];
+  $('fValidade').value = ''; S.laudosAnt = []; $('fDestino').value = ''; $('fCliente').value = ''; $('fCliWrap').hidden = true;
   F.data.value = keepIdent ? keep.data : hoje(); F.analista.value = keep.analista;
   S.sitTouched = false; S.editing = null; setLaudo(null); $('editBar').hidden = true; $('saveBtn').textContent = 'Registrar liberação';
   refreshForm();
 }
 $('cancelEdit').addEventListener('click', () => resetForm(false));
+$('fDestino').addEventListener('change', () => { const c = $('fDestino').value === 'cliente'; $('fCliWrap').hidden = !c; if (c) { fillClientes(); $('fCliente').focus(); } });
+function fillClientes() {
+  const set = new Set((LZ.all || []).map(h => h.cliente).filter(Boolean));
+  allRecs('ALL', MODS.pa).forEach(r => { if (r.cliente) set.add(r.cliente); });
+  $('dlClientes').innerHTML = [...set].sort().map(c => `<option value="${esc(c)}">`).join('');
+}
+$('fCliente').addEventListener('focus', fillClientes);
 
 /* laudo (FR 001) */
 function setLaudo(l) {
@@ -1016,6 +1030,7 @@ $('relForm').addEventListener('submit', async (e) => {
   if (!rec.analista) return err('Informe quem analisou.');
   if (M.validade && !rec.validade) return err('Informe a data de validade do lote.');
   if (!rec.situacao) return err('Escolha a situação do lote.');
+  if (M.key === 'pa' && rec.destino === 'cliente' && !rec.cliente) { $('fCliente').focus(); return err('Informe o nome do cliente ou mude o destino para Estoque.'); }
   if (rec.situacao === 'APROVADO' && ev.fora.length && !rec.obs) return err('Para aprovar com parâmetro fora da especificação, escreva a justificativa na observação.');
   const mes = rec.data.slice(0, 7);
   const dup = allRecs(mes).find(r => r.lote === rec.lote && r.produto === rec.produto && !(S.editing && ((r._src === 'live' && S.editing.src !== 'arquivo' && S.editing.id === r.id) || (r._src === 'arquivo' && S.editing.aid === r._id))));
@@ -1066,6 +1081,7 @@ function loadIntoForm(r) {
   F.rnc.value = r.rnc || ''; F.rncStatus.value = r.rncStatus || ''; F.obs.value = r.obs || '';
   S.editing = { id: r.id, mes: r._mes, criadoEm: r.criadoEm, criadoPor: r.criadoPor, src: r._src, aid: r._id };
   S.laudosAnt = (r.laudosAnteriores || []).slice(); setLaudo(r.laudo || null); $('fValidade').value = r.validade || '';
+  $('fDestino').value = r.destino || (r.cliente ? 'cliente' : ''); $('fCliente').value = r.cliente || ''; $('fCliWrap').hidden = $('fDestino').value !== 'cliente';
   $('editBar').hidden = false; $('editTxt').textContent = `Editando lote ${r.lote} · ${r.produto}${r._src === 'arquivo' ? ' (importado da planilha)' : ''}`; $('saveBtn').textContent = 'Salvar alterações';
   S.sitTouched = true; setSituacao(r.situacao || 'APROVADO', true); refreshForm(); fillExtras(r.extras); refreshForm();
   history.replaceState(null, '', hashFor('liberar')); showTab('liberar'); window.scrollTo(0, 0);
@@ -1194,6 +1210,7 @@ function openRec(r) {
     + M.fields.map(line).join('')
     + (sp.extras || []).map(e => `<dt>${esc(e.nome)}</dt><dd><span class="num">${shown(r.extras?.[e.id])}</span>${e.unidade && e.tipo !== 'aprovacao' ? ' ' + esc(e.unidade) : ''} <span class="src">(${extraRange(e)})</span> ${chip(ev.x[e.id])}</dd>`).join('')
     + (r.rnc || r.rncStatus ? `<dt>RNC</dt><dd class="mono">${esc(r.rnc || '—')} ${esc(r.rncStatus || '')}</dd>` : '')
+    + (M.key === 'pa' && (r.destino || r.cliente) ? `<dt>Destino</dt><dd>${r.cliente ? 'Cliente: ' + esc(r.cliente) : 'Estoque'}</dd>` : '')
     + `<dt>Analisado por</dt><dd>${esc(r.analista || '—')}</dd>` + (M.laudo ? `<dt>Laudo</dt><dd>${laudo}</dd>` : '') + (M.key === 'pa' ? rastreio(r) : '') + `<dt>Observação</dt><dd>${esc(r.obs || '—')}</dd>`
     + `<dt>Origem</dt><dd class="src">${r._src === 'arquivo' ? `Importado da planilha ${frOf(M)}${r.editadoNoApp ? ' · editado no app' + (r.atualizadoEm ? ' em ' + new Date(r.atualizadoEm).toLocaleString('pt-BR') : '') : ''}` : 'Registrado no app' + (r.atualizadoEm ? ' · ' + new Date(r.atualizadoEm).toLocaleString('pt-BR') : '')}${r.dataSuspeita ? '<br>A data original na planilha estava fora do mês da aba.' : ''}</dd>`;
   const act = $('dRecActions'); act.innerHTML = '';
@@ -1535,13 +1552,14 @@ async function carregarTudo(mod) {
 function planilhaFR(X, mod) {
   const AV = { ok: 'CONFORME', nc: 'N/C', na: 'N/A', pend: 'NÃO AVALIADO', free: '' };
   const num = (v) => v == null || v === '' ? '' : v;
-  const cols = ['Data', mod.itemCol, 'Lote', mod.aux.label].concat(mod.validade ? ['Validade', 'Situação da validade'] : []);
+  const cols = ['Data', mod.itemCol, 'Lote', mod.aux.label].concat(mod.validade ? ['Validade', 'Situação da validade'] : []).concat(mod.key === 'pa' ? ['Destino'] : []);
   mod.fields.forEach(f => { const u = f.unit && f.tipo !== 'aprov' ? ` (${f.k === 'visc' ? 's ou cP' : f.unit})` : ''; if (f.tipo === 'faixa') cols.push(f.nome + u, f.nome + ' mín', f.nome + ' máx', f.nome + ' avaliação'); else cols.push(f.nome + u); });
   cols.push('Outros ensaios', 'Situação', 'Fora da especificação', 'Nº RNC', 'Status da RNC', 'Analisado por', 'Observação', 'Origem'); if (mod.laudo) cols.push('Laudo');
   const linha = (r) => {
     const ev = evalRec(r, mod), sp = specOf(r, mod) || {};
     const v = [r.data ? new Date(r.data + 'T12:00:00') : '', r.produto || '', r.lote || '', r[mod.aux.k] || ''];
     if (mod.validade) { const li = lotInfo(r); v.push(li.validade ? new Date(li.validade + 'T12:00:00') : '', VSTAT[li.st]?.[1] || ''); }
+    if (mod.key === 'pa') v.push(r.cliente ? 'Cliente: ' + r.cliente : r.destino === 'estoque' ? 'Estoque' : '');
     mod.fields.forEach(f => { if (f.tipo === 'faixa') v.push(num(r[f.k]), num(sp[f.mn]), num(sp[f.mx]), AV[ev[f.k]] || ''); else v.push(num(r[f.k])); });
     v.push((sp.extras || []).map(e => `${e.nome}=${r.extras?.[e.id] == null ? '-' : (typeof r.extras[e.id] === 'number' ? fmt(r.extras[e.id]) : r.extras[e.id])}${e.unidade && e.tipo !== 'aprovacao' ? ' ' + e.unidade : ''} [${AV[ev.x[e.id]] || ''}]`).join(' | '),
       r.situacao || '', (ev.fora || []).join(', '), r.rnc || '', r.rncStatus || '', r.analista || '', r.obs || '',
@@ -2242,7 +2260,7 @@ function renderLaudoList() {
   recs.sort((a, b) => (b.data || '').localeCompare(a.data || '') || String(b.lote).localeCompare(String(a.lote), 'pt', { numeric: true }));
   $('lResCount').textContent = q ? `${recs.length} encontrados` : 'Últimos lotes aprovados';
   const sel = !LZ.cur && LZ.rec?._id;
-  $('lResults').innerHTML = recs.slice(0, 40).map(r => `<button type="button" data-id="${esc(r._id)}" aria-pressed="${r._id === sel}"><span class="mono">${esc(r.lote)}</span><span>${esc(r.produto)}</span><span class="src">${dataBR(r.data)} · <span class="sit ${esc(r.situacao)}">${esc(r.situacao)}</span></span></button>`).join('')
+  $('lResults').innerHTML = recs.slice(0, 40).map(r => `<button type="button" data-id="${esc(r._id)}" aria-pressed="${r._id === sel}"><span class="mono">${esc(r.lote)}</span><span>${esc(r.produto)}</span><span class="src">${dataBR(r.data)} · <span class="sit ${esc(r.situacao)}">${esc(r.situacao)}</span>${r.cliente ? ` · Cliente: <b>${esc(r.cliente)}</b>` : r.destino === 'estoque' ? ' · Estoque' : ''}</span></button>`).join('')
     || `<div class="empty">${D.pa.arquivo.size ? 'Nenhum lote encontrado.' : 'Carregando lotes…'}</div>`;
 }
 $('ldBusca').addEventListener('input', renderLaudoList);
@@ -2265,7 +2283,7 @@ function pickLaudoRec(r) {
   add('ASPECTO VISUAL', (item.visual || '-').toUpperCase(), resTxt(r.aparencia || 'OK'), false);
   LZ.ens = ens;
   $('lProducao').value = r.data || ''; $('lEntrega').value = '';
-  $('lNF').value = ''; $('lQtd').value = ''; $('lCliente').value = '';
+  $('lNF').value = ''; $('lQtd').value = ''; $('lCliente').value = r.cliente && !laudosDoLote(r).some(h => normNome(h.cliente || '') === normNome(r.cliente)) ? r.cliente : '';
   $('lLinha1').value = LZ.cfg.linha1; $('lLinha2').value = LZ.cfg.linha2;
   renderEns(); renderLaudoList(); renderPend(); renderLaudo();
 }
