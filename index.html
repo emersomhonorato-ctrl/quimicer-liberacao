@@ -731,7 +731,7 @@ const MODS = {
       { k: 'imperm', nome: 'Impermeabilidade', short: 'Imperm.', tipo: 'aprov', txt: 'diluicao', txtPre: 'Diluição para o teste: ', hint: 'Teste de aplicação' },
       { k: 'colagem', nome: 'Colagem', short: 'Colagem', tipo: 'aprov', txt: 'colagem', hint: 'Teste de aplicação' },
       { k: 'aparencia', nome: 'Aparência', short: 'Aparência', unit: 'visual', tipo: 'aprov', txt: 'visual', def: 'OK', req: true }],
-    specText: [{ k: 'visual', label: 'Aparência esperada', full: true, ph: 'Ex.: Líquido leitoso' }, { k: 'colagem', label: 'Teste de colagem' }, { k: 'umidade', label: 'Umidade' }, { k: 'diluicao', label: 'Diluição p/ teste de impermeabilização', ph: 'Ex.: 1:10 em água ou 10%' }],
+    specText: [{ k: 'visual', label: 'Aparência esperada', full: true, ph: 'Ex.: Líquido leitoso' }, { k: 'colagem', label: 'Teste de colagem' }, { k: 'umidade', label: 'Umidade' }, { k: 'diluicao', label: 'Diluição p/ teste de impermeabilização', ph: 'Ex.: 1:10 em água ou 10%', soNovo: true }],
     laudo: false, codigo: false, csv: 'FR002', docs: true,
   },
   pi: {
@@ -1410,7 +1410,7 @@ function openSpec(id) {
       + `<div class="field" data-vt="brookfield"${isBrook(p) ? '' : ' hidden'}><label for="sViscRpm">Rotação (rpm)</label><input type="text" id="sViscRpm" class="mono" inputmode="decimal" placeholder="Ex.: 20" value="${esc(p.viscRpm || '')}"></div>`
       + `<div class="field" data-vt="brookfield"${isBrook(p) ? '' : ' hidden'}><label for="sViscTemp">Temperatura (°C)</label><input type="text" id="sViscTemp" class="mono" inputmode="decimal" placeholder="Ex.: 25" value="${esc(p.viscTemp || '')}"></div>`;
   });
-  M.specText.forEach(t => { h += `<div class="field${t.full ? ' full' : ''}"><label for="st_${t.k}">${esc(t.label)}</label><input type="text" id="st_${t.k}" placeholder="${esc(t.ph || '')}" value="${esc(p[t.k] || '')}"></div>`; });
+  M.specText.forEach(t => { if (t.soNovo && id && !p[t.k]) return; h += `<div class="field${t.full ? ' full' : ''}"><label for="st_${t.k}">${esc(t.label)}</label><input type="text" id="st_${t.k}" placeholder="${esc(t.ph || '')}" value="${esc(p[t.k] || '')}"></div>`; });
   $('specFields').innerHTML = h;
   $('extrasList').innerHTML = ''; (p.extras || []).forEach(addExtraRow); extrasEmptyState();
   $('specErr').hidden = true; renderSpecDocs();
@@ -1487,7 +1487,7 @@ $('specForm').addEventListener('submit', async (e) => {
     });
     doc.extras = readExtraSpecs();
   } catch (m) { return err(m); }
-  M.specText.forEach(t => doc[t.k] = $('st_' + t.k).value.trim());
+  M.specText.forEach(t => { const el = $('st_' + t.k); if (el) doc[t.k] = el.value.trim(); });
   const id = specEditing || slug(nome);
   if (!specEditing && st().itens.has(id)) return err('Já existe um item com esse nome.');
   const tipoEsp = !specEditing ? 'inclusao' : (old.ativo !== false && doc.ativo === false) ? 'exclusao' : (old.ativo === false && doc.ativo !== false) ? 'reinclusao' : 'alteracao';
