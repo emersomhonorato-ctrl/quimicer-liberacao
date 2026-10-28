@@ -157,3 +157,23 @@ jobs:
           ls -la out/excel
           [ "$(ls out/excel/*.xlsx | wc -l)" = "3" ] || { echo "::error::Faltou alguma planilha"; exit 1; }
           echo "EXCEL_OK"
+
+      - name: Etapa 8 - Enviar ao Drive e manter as 5 ultimas copias
+        run: |
+          set -euo pipefail
+          D=$(TZ=America/Sao_Paulo date +%Y-%m-%d)
+          Z="backup_quimicer_$D.zip"
+          (cd out && zip -r -9 -q "../$Z" .)
+          unzip -t "$Z" >/dev/null && echo "Pacote integro: $Z ($(du -h "$Z" | cut -f1))"
+          unzip -l "$Z" | tail -n +4 | head -n -2
+          DEST="gdrive:Backup Quimicer/copias"
+          rclone copyto "$Z" "$DEST/$Z"
+          rclone lsf "$DEST" --files-only --include "backup_quimicer_*.zip" | sort > lista.txt
+          grep -qx "$Z" lista.txt || { echo "::error::Pacote nao apareceu no Drive"; exit 1; }
+          N=$(wc -l < lista.txt)
+          if [ "$N" -gt 5 ]; then
+            head -n $((N-5)) lista.txt | while read -r f; do rclone deletefile "$DEST/$f" && echo "Copia antiga removida: $f"; done
+          fi
+          rclone purge "gdrive:Backup Quimicer/teste" >/dev/null 2>&1 || true
+          echo "Copias guardadas no Drive:"; rclone lsl "$DEST" --include "backup_quimicer_*.zip"
+          echo "DRIVE_OK"
