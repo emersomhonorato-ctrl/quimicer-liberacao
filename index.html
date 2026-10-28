@@ -66,6 +66,7 @@ main { padding-block: 20px 60px }
 .ident.val { grid-template-columns: 2fr 1fr 1fr }
 .destrow { display: grid; grid-template-columns: 200px minmax(0, 1fr) 210px; gap: 12px; margin-top: 12px }
 @media (max-width: 700px) { .destrow { grid-template-columns: 1fr } }
+@media (min-width: 701px) { .destrow #fQtdWrap { grid-column: 3 } }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0 }
 .field label { font-size: 12px; font-weight: 600; color: var(--muted) }
 input[type=text], input[type=date], input[type=search], select, textarea {
@@ -373,7 +374,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
             <div class="destrow" id="destRow" hidden>
               <div class="field"><label for="fDestino">Destino do lote</label><select id="fDestino"><option value="">Não informado</option><option value="estoque">Estoque</option><option value="cliente">Cliente</option></select></div>
               <div class="field" id="fCliWrap" hidden><label for="fCliente">Nome do cliente <span class="src">(cliente e quantidade já vão para o laudo)</span></label><input type="text" id="fCliente" list="dlClientes" autocomplete="off" placeholder="Ex.: ETERNIT S.A."></div>
-              <div class="field" id="fQtdWrap" hidden><label for="fQtdCli">Quantidade</label><div style="display:flex;gap:6px"><input type="text" id="fQtdCli" class="mono" inputmode="decimal" placeholder="Ex.: 1000" style="min-width:0;flex:1"><select id="fQtdUn" aria-label="Unidade" style="width:72px"><option value="kg">kg</option><option value="L">L</option></select></div></div>
+              <div class="field" id="fQtdWrap"><label for="fQtdCli">Quantidade</label><div style="display:flex;gap:6px"><input type="text" id="fQtdCli" class="mono" inputmode="decimal" placeholder="Ex.: 1000" style="min-width:0;flex:1"><select id="fQtdUn" aria-label="Unidade" style="width:72px"><option value="kg">kg</option><option value="L">L</option></select></div></div>
             </div>
             <div class="prodinfo" id="prodInfo">Escolha o item para carregar a especificação.</div>
           </div>
@@ -1056,7 +1057,7 @@ function formRec() {
   M.fields.forEach(f => { if (f.tipo === 'calc') r[f.k] = f.calc(r); });
   if (M.laudo) { r.laudo = S.laudo || null; r.laudosAnteriores = (S.laudosAnt || []).slice(); }
   if (M.validade) r.validade = $('fValidade').value || '';
-  if (M.key === 'pa') { r.destino = $('fDestino').value || ''; r.cliente = r.destino === 'cliente' ? normNome($('fCliente').value) : ''; r.qtdCliente = r.destino === 'cliente' ? $('fQtdCli').value.trim() : ''; r.qtdUn = r.qtdCliente ? $('fQtdUn').value : ''; }
+  if (M.key === 'pa') { r.destino = $('fDestino').value || ''; r.cliente = r.destino === 'cliente' ? normNome($('fCliente').value) : ''; r.qtdCliente = $('fQtdCli').value.trim(); r.qtdUn = r.qtdCliente ? $('fQtdUn').value : ''; }
   return r;
 }
 function readExtras() {
@@ -1136,7 +1137,7 @@ function resetForm(keepIdent) {
   ['produto', 'lote', 'aux', 'rnc', 'obs'].forEach(k => F[k].value = '');
   F.rncStatus.value = '';
   M.fields.forEach(f => { const el = fin(f.k); if (el) el.value = f.tipo === 'aprov' ? (f.def || '') : ''; });
-  $('fValidade').value = ''; S.laudosAnt = []; $('fDestino').value = ''; $('fCliente').value = ''; $('fQtdCli').value = ''; $('fQtdUn').value = 'kg'; $('fCliWrap').hidden = true; $('fQtdWrap').hidden = true;
+  $('fValidade').value = ''; S.laudosAnt = []; $('fDestino').value = ''; $('fCliente').value = ''; $('fQtdCli').value = ''; $('fQtdUn').value = 'kg'; $('fCliWrap').hidden = true;
   F.data.value = keepIdent ? keep.data : hoje(); F.analista.value = keep.analista;
   S.sitTouched = false; S.editing = null; setLaudo(null); $('editBar').hidden = true; $('saveBtn').textContent = 'Registrar liberação';
   refreshForm();
@@ -1147,7 +1148,7 @@ $('btnAtualizar').addEventListener('click', async () => {
   try { if ('caches' in window) { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.update(); } catch {}
   location.reload();
 });
-$('fDestino').addEventListener('change', () => { const c = $('fDestino').value === 'cliente'; $('fCliWrap').hidden = !c; $('fQtdWrap').hidden = !c; if (c) { fillClientes(); $('fCliente').focus(); } });
+$('fDestino').addEventListener('change', () => { const c = $('fDestino').value === 'cliente'; $('fCliWrap').hidden = !c; if (c) { fillClientes(); $('fCliente').focus(); } });
 function fillClientes() {
   const set = new Set((LZ.all || []).map(h => h.cliente).filter(Boolean));
   allRecs('ALL', MODS.pa).forEach(r => { if (r.cliente) set.add(r.cliente); });
@@ -1241,7 +1242,7 @@ function loadIntoForm(r) {
   F.rnc.value = r.rnc || ''; F.rncStatus.value = r.rncStatus || ''; F.obs.value = r.obs || '';
   S.editing = { id: r.id, mes: r._mes, criadoEm: r.criadoEm, criadoPor: r.criadoPor, src: r._src, aid: r._id };
   S.laudosAnt = (r.laudosAnteriores || []).slice(); setLaudo(r.laudo || null); $('fValidade').value = r.validade || '';
-  $('fDestino').value = r.destino || (r.cliente ? 'cliente' : ''); $('fCliente').value = r.cliente || ''; $('fQtdCli').value = r.qtdCliente || ''; $('fQtdUn').value = r.qtdUn || 'kg'; $('fCliWrap').hidden = $('fDestino').value !== 'cliente'; $('fQtdWrap').hidden = $('fCliWrap').hidden;
+  $('fDestino').value = r.destino || (r.cliente ? 'cliente' : ''); $('fCliente').value = r.cliente || ''; $('fQtdCli').value = r.qtdCliente || ''; $('fQtdUn').value = r.qtdUn || 'kg'; $('fCliWrap').hidden = $('fDestino').value !== 'cliente';
   $('editBar').hidden = false; $('editTxt').textContent = `Editando lote ${r.lote} · ${r.produto}${r._src === 'arquivo' ? ' (importado da planilha)' : ''}`; $('saveBtn').textContent = 'Salvar alterações';
   S.sitTouched = true; setSituacao(r.situacao || 'APROVADO', true); refreshForm(); fillExtras(r.extras); refreshForm();
   history.replaceState(null, '', hashFor('liberar')); showTab('liberar'); window.scrollTo(0, 0);
@@ -1461,7 +1462,7 @@ function openRec(r) {
     + (sp.extras || []).map(e => `<dt>${esc(e.nome)}</dt><dd><span class="num">${shown(r.extras?.[e.id])}</span>${e.unidade && e.tipo !== 'aprovacao' ? ' ' + esc(e.unidade) : ''} <span class="src">(${extraRange(e)})</span> ${chip(ev.x[e.id])}</dd>`).join('')
     + (specOriginalTxt(r) ? `<dt>Especificação na data da liberação</dt><dd class="src">${esc(specOriginalTxt(r))} <br>(a avaliação acima usa a especificação atual)</dd>` : '')
     + (r.rnc || r.rncStatus ? `<dt>RNC</dt><dd class="mono">${esc(r.rnc || '—')} ${esc(r.rncStatus || '')}</dd>` : '') + rncFicha(r)
-    + (M.key === 'pa' && (r.destino || r.cliente) ? `<dt>Destino</dt><dd>${r.cliente ? 'Cliente: ' + esc(r.cliente) + (r.qtdCliente ? ' · ' + esc(qtdTxt(r.qtdCliente, r.qtdUn)) : '') : 'Estoque'}</dd>` : '')
+    + (M.key === 'pa' && (r.destino || r.cliente || r.qtdCliente) ? `<dt>Destino</dt><dd>${r.cliente ? 'Cliente: ' + esc(r.cliente) : r.destino === 'estoque' ? 'Estoque' : 'Não informado'}${r.qtdCliente ? ' · ' + esc(qtdTxt(r.qtdCliente, r.qtdUn)) : ''}</dd>` : '')
     + `<dt>Analisado por</dt><dd>${esc(r.analista || '—')}</dd>` + (M.laudo ? `<dt>Laudo</dt><dd>${laudo}</dd>` : '') + (M.key === 'pa' ? rastreio(r) : '') + `<dt>Observação</dt><dd>${esc(r.obs || '—')}</dd>`
     + `<dt>Origem</dt><dd class="src">${r._src === 'arquivo' ? `Importado da planilha ${frOf(M)}${r.editadoNoApp ? ' · editado no app' + (r.atualizadoEm ? ' em ' + new Date(r.atualizadoEm).toLocaleString('pt-BR') : '') : ''}` : 'Registrado no app' + (r.atualizadoEm ? ' · ' + new Date(r.atualizadoEm).toLocaleString('pt-BR') : '')}${r.dataSuspeita ? '<br>A data original na planilha estava fora do mês da aba.' : ''}</dd>`;
   const act = $('dRecActions'); act.innerHTML = '';
@@ -2895,7 +2896,7 @@ function pickLaudoRec(r) {
   LZ.ens = ens;
   $('lProducao').value = r.data || ''; $('lEntrega').value = '';
   const preCli = r.cliente && !laudosDoLote(r).some(h => normNome(h.cliente || '') === normNome(r.cliente));
-  $('lNF').value = ''; $('lCliente').value = preCli ? r.cliente : ''; $('lQtd').value = preCli ? (r.qtdCliente || '') : ''; $('lUn').value = preCli && r.qtdUn ? r.qtdUn : 'kg';
+  $('lNF').value = ''; $('lCliente').value = preCli ? r.cliente : ''; const preQtd = preCli || (!r.cliente && !laudosDoLote(r).length); $('lQtd').value = preQtd ? (r.qtdCliente || '') : ''; $('lUn').value = preQtd && r.qtdUn ? r.qtdUn : 'kg';
   $('lLinha1').value = LZ.cfg.linha1; $('lLinha2').value = LZ.cfg.linha2;
   renderEns(); renderLaudoList(); renderPend(); renderLaudo();
 }
