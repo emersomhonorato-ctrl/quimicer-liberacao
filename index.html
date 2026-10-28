@@ -293,7 +293,7 @@ dl.kv dd { margin: 0; min-width: 0 }
 html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% } img { max-width: 100% }
 .gate a { color: var(--accent) } .gate a:hover { text-decoration: none }
 </style>
-<script>window.APP_BUILD = '28/10/2026 15:33';</script>
+<script>window.APP_BUILD = '28/10/2026 17:07';</script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 </head>
@@ -471,7 +471,8 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
     <div id="lvFila" hidden>
       <div class="panel">
         <div class="hd"><span class="label">Aguardando faturamento</span><span class="src" id="lPendCount"></span></div>
-        <div class="bd" style="padding-top:8px"><p class="src" style="margin:0 0 8px">Laudos preparados pelo laboratório. Clique em um para preencher a nota fiscal e a data de entrega e emitir o PDF.</p><div class="lresults" id="lPend" style="margin-top:0;max-height:none"></div></div>
+        <div class="bd" style="padding-top:8px"><p class="src" style="margin:0 0 8px">Laudos preparados pelo laboratório. Clique em um para preencher a nota fiscal e a data de entrega e emitir o PDF.</p>
+        <div class="field" style="margin-bottom:10px"><label for="lfBusca">Buscar por lote, produto ou cliente</label><input type="search" id="lfBusca" placeholder="Ex.: 104194, REAVIT 3D MAX, QUIMICER FILIAL"></div><div class="lresults" id="lPend" style="margin-top:0;max-height:none"></div></div>
       </div>
     </div>
     <div id="lvEmitidos" hidden>
@@ -3067,11 +3068,13 @@ $('lSalvarResp').addEventListener('click', async () => {
   catch { $('lRespMsg').textContent = 'Somente administradores podem mudar o padrão.'; }
 });
 function renderPend() {
-  const pend = LZ.all.filter(h => h.status === 'aguardando');
-  $('lPendCount').textContent = pend.length ? `${pend.length} na fila` : '';
-  $('lvFilaN').textContent = pend.length || '';
+  const pendAll = LZ.all.filter(h => h.status === 'aguardando');
+  const qf = $('lfBusca').value.trim().toUpperCase().split(/\s+/).filter(Boolean);
+  const pend = qf.length ? pendAll.filter(h => { const t = `${h.lote} ${h.produto} ${h.cliente || ''}`.toUpperCase(); return qf.every(w => t.includes(w)); }) : pendAll;
+  $('lPendCount').textContent = pendAll.length ? (qf.length ? `${pend.length} de ${pendAll.length} na fila` : `${pendAll.length} na fila`) : '';
+  $('lvFilaN').textContent = pendAll.length || '';
   $('lPend').innerHTML = pend.map(h => `<button type="button" class="pend-row" data-lid="${esc(h.id)}" aria-pressed="${LZ.cur?.id === h.id}"><span class="mono">${esc(h.lote)}</span><span>${esc(h.produto)}</span><span class="src">${dt(h.preparadoEm)}</span><span class="sub">${esc(h.cliente || 'Cliente a definir')}${h.qtd ? ' · ' + esc(qtdTxt(h.qtd, h.un)) : ''}</span></button>`).join('')
-    || `<div class="empty">Nenhum laudo aguardando faturamento.</div>`;
+    || `<div class="empty">${qf.length && pendAll.length ? 'Nenhum laudo da fila com essa busca.' : 'Nenhum laudo aguardando faturamento.'}</div>`;
   const clientes = [...new Set(LZ.all.map(h => h.cliente).filter(Boolean))].sort();
   $('dlClientes').innerHTML = clientes.map(c => `<option value="${esc(c)}">`).join('');
   const cs = $('leCli').value; $('leCli').innerHTML = '<option value="">Todos</option>' + clientes.map(c => `<option${c === cs ? ' selected' : ''}>${esc(c)}</option>`).join('');
@@ -3080,6 +3083,7 @@ function renderPend() {
   $('lCfgResumo').textContent = $('lLinha2').value ? '· ' + $('lLinha2').value.slice(0, 60) : '';
   renderEmitidos();
 }
+$('lfBusca').addEventListener('input', renderPend);
 function laudosFiltrados() {
   const q = $('leBusca').value.trim().toUpperCase(), pr = normNome($('leProd').value), cli = $('leCli').value, de = $('leDe').value, ate = $('leAte').value, stt = $('leSt').value;
   return LZ.all.filter(h => {
