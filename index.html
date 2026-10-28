@@ -189,6 +189,7 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 13px; min-width:
 .lnav .cnt:empty { display: none }
 details.lcfg summary { cursor: pointer; list-style: revert }
 #leBody tr { cursor: pointer }
+@media (max-width: 700px) { .lfgrid { grid-template-columns: 1fr 1fr !important } .lfgrid > .field:first-child { grid-column: 1 / -1 } }
 .laudos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 20px; align-items: start }
 .lresults { display: flex; flex-direction: column; margin-top: 10px; max-height: 300px; overflow: auto; border: 1px solid var(--line); border-radius: 6px }
 .lresults button { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; text-align: left; border: 0; border-bottom: 1px solid var(--soft); background: var(--surface); padding: 8px 10px; cursor: pointer; font-size: 13px }
@@ -293,7 +294,7 @@ dl.kv dd { margin: 0; min-width: 0 }
 html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% } img { max-width: 100% }
 .gate a { color: var(--accent) } .gate a:hover { text-decoration: none }
 </style>
-<script>window.APP_BUILD = '28/10/2026 17:07';</script>
+<script>window.APP_BUILD = '28/10/2026 17:14';</script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 </head>
@@ -472,7 +473,12 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       <div class="panel">
         <div class="hd"><span class="label">Aguardando faturamento</span><span class="src" id="lPendCount"></span></div>
         <div class="bd" style="padding-top:8px"><p class="src" style="margin:0 0 8px">Laudos preparados pelo laboratório. Clique em um para preencher a nota fiscal e a data de entrega e emitir o PDF.</p>
-        <div class="field" style="margin-bottom:10px"><label for="lfBusca">Buscar por lote, produto ou cliente</label><input type="search" id="lfBusca" placeholder="Ex.: 104194, REAVIT 3D MAX, QUIMICER FILIAL"></div><div class="lresults" id="lPend" style="margin-top:0;max-height:none"></div></div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 170px 170px auto;gap:10px;align-items:end;margin-bottom:10px" class="lfgrid">
+          <div class="field"><label for="lfBusca">Buscar por lote, produto ou cliente</label><input type="search" id="lfBusca" placeholder="Ex.: 104194, REAVIT 3D MAX, QUIMICER FILIAL"></div>
+          <div class="field"><label for="lfDe">Preparado de</label><input type="date" id="lfDe"></div>
+          <div class="field"><label for="lfAte">até</label><input type="date" id="lfAte"></div>
+          <button type="button" class="btn small" id="lfLimpar">Limpar</button>
+        </div><div class="lresults" id="lPend" style="margin-top:0;max-height:none"></div></div>
       </div>
     </div>
     <div id="lvEmitidos" hidden>
@@ -3070,11 +3076,13 @@ $('lSalvarResp').addEventListener('click', async () => {
 function renderPend() {
   const pendAll = LZ.all.filter(h => h.status === 'aguardando');
   const qf = $('lfBusca').value.trim().toUpperCase().split(/\s+/).filter(Boolean);
-  const pend = qf.length ? pendAll.filter(h => { const t = `${h.lote} ${h.produto} ${h.cliente || ''}`.toUpperCase(); return qf.every(w => t.includes(w)); }) : pendAll;
-  $('lPendCount').textContent = pendAll.length ? (qf.length ? `${pend.length} de ${pendAll.length} na fila` : `${pendAll.length} na fila`) : '';
+  const fDe = $('lfDe').value, fAte = $('lfAte').value, filt = qf.length || fDe || fAte;
+  const pend = pendAll.filter(h => { const t = `${h.lote} ${h.produto} ${h.cliente || ''}`.toUpperCase(); const d = String(h.preparadoEm || h.atualizadoEm || '').slice(0, 10);
+    return qf.every(w => t.includes(w)) && (!fDe || d >= fDe) && (!fAte || d <= fAte); });
+  $('lPendCount').textContent = pendAll.length ? (filt ? `${pend.length} de ${pendAll.length} na fila` : `${pendAll.length} na fila`) : '';
   $('lvFilaN').textContent = pendAll.length || '';
   $('lPend').innerHTML = pend.map(h => `<button type="button" class="pend-row" data-lid="${esc(h.id)}" aria-pressed="${LZ.cur?.id === h.id}"><span class="mono">${esc(h.lote)}</span><span>${esc(h.produto)}</span><span class="src">${dt(h.preparadoEm)}</span><span class="sub">${esc(h.cliente || 'Cliente a definir')}${h.qtd ? ' · ' + esc(qtdTxt(h.qtd, h.un)) : ''}</span></button>`).join('')
-    || `<div class="empty">${qf.length && pendAll.length ? 'Nenhum laudo da fila com essa busca.' : 'Nenhum laudo aguardando faturamento.'}</div>`;
+    || `<div class="empty">${filt && pendAll.length ? 'Nenhum laudo da fila com esses filtros.' : 'Nenhum laudo aguardando faturamento.'}</div>`;
   const clientes = [...new Set(LZ.all.map(h => h.cliente).filter(Boolean))].sort();
   $('dlClientes').innerHTML = clientes.map(c => `<option value="${esc(c)}">`).join('');
   const cs = $('leCli').value; $('leCli').innerHTML = '<option value="">Todos</option>' + clientes.map(c => `<option${c === cs ? ' selected' : ''}>${esc(c)}</option>`).join('');
@@ -3083,7 +3091,8 @@ function renderPend() {
   $('lCfgResumo').textContent = $('lLinha2').value ? '· ' + $('lLinha2').value.slice(0, 60) : '';
   renderEmitidos();
 }
-$('lfBusca').addEventListener('input', renderPend);
+['lfBusca', 'lfDe', 'lfAte'].forEach(id => $(id).addEventListener('input', renderPend));
+$('lfLimpar').addEventListener('click', () => { ['lfBusca', 'lfDe', 'lfAte'].forEach(id => $(id).value = ''); renderPend(); });
 function laudosFiltrados() {
   const q = $('leBusca').value.trim().toUpperCase(), pr = normNome($('leProd').value), cli = $('leCli').value, de = $('leDe').value, ate = $('leAte').value, stt = $('leSt').value;
   return LZ.all.filter(h => {
