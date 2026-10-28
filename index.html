@@ -553,6 +553,8 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
         <div class="bd" style="padding-top:6px"><div id="indNovMes" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div><div style="overflow-x:auto;max-height:400px"><table class="acc"><thead><tr><th>Data</th><th>Item</th><th>Form.</th><th>Origem da data</th></tr></thead><tbody id="indNovBody"></tbody></table></div>
         <div class="src" style="margin-top:8px">A data vem do cadastro no app; para itens antigos, da inclusão na ESP ou da 1ª liberação.</div></div></div>
     </div>
+    <div class="panel" id="ind2Panel" style="margin-top:14px"><div class="hd"><span class="label">Sem liberação há 2 anos</span><span class="src" id="ind2N"></span></div>
+      <div class="bd" style="padding-top:6px"><div class="src" id="ind2Info" style="margin-bottom:8px"></div><div style="overflow-x:auto;max-height:460px"><table class="acc"><thead><tr><th>Item</th><th>Form.</th><th>Última liberação</th><th>Sem liberar há</th><th></th></tr></thead><tbody id="ind2Body"></tbody></table></div></div></div>
   </section>
 
 <dialog id="dRnc" style="width:min(960px,calc(100vw - 16px))"><form id="rncForm" novalidate>
@@ -606,6 +608,16 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
     <div class="row" style="justify-content:flex-end"><button type="button" class="btn" id="frAss" style="margin-right:auto">Lista de assinatura da revisão atual</button><button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn primary">Salvar revisão</button></div>
   </div></form></dialog>
 
+<dialog id="d2Anos"><form id="a2Form" novalidate>
+  <div class="hd"><div><div class="label" id="a2Sub">Sem liberação há 2 anos</div><h2 style="font-size:22px" id="a2Nome"></h2></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
+  <div class="bd" style="display:flex;flex-direction:column;gap:12px">
+    <div class="lwarn" id="a2Info"></div>
+    <p style="margin:0">Deseja retirar (inativar) este produto?</p>
+    <div class="field"><label for="a2Motivo">Motivo da revisão da ESP (se inativar)</label><textarea id="a2Motivo"></textarea></div>
+    <div class="src">Inativar: o item sai da lista de liberação e a ESP registra a exclusão; pode ser reativado depois nas especificações. Não inativar: o aviso volta daqui a 1 ano se continuar sem liberação. Desativar alerta: o aviso não aparece mais para este item.</div>
+    <div class="err" id="a2Err" hidden></div>
+    <div class="row" style="justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn" id="a2Off">Desativar alerta</button><button type="button" class="btn" id="a2Nao">Não inativar</button><button type="submit" class="btn danger" id="a2Sim">Sim, inativar</button></div>
+  </div></form></dialog>
 <dialog id="dExcl"><form id="exForm" novalidate>
   <div class="hd"><div><div class="label">Excluir item da especificação</div><h2 style="font-size:22px" id="exNome"></h2></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
   <div class="bd" style="display:flex;flex-direction:column;gap:12px">
@@ -648,7 +660,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
   <section class="view" id="v-especificacoes" hidden>
     <div class="toolbar">
       <div class="field grow"><label for="pBusca" id="lPBusca">Buscar</label><input type="search" id="pBusca"></div>
-      <div class="field"><label for="pFiltro">Mostrar</label><select id="pFiltro"><option value="">Todos</option><option value="ativo">Ativos</option><option value="semspec">Sem nenhum limite</option><option value="inativo">Inativos</option></select></div>
+      <div class="field"><label for="pFiltro">Mostrar</label><select id="pFiltro"><option value="">Todos</option><option value="ativo">Ativos</option><option value="semspec">Sem nenhum limite</option><option value="inativo">Inativos</option><option value="2anos">Sem liberação há 2 anos</option></select></div>
       <button class="btn" id="pImport" type="button" hidden>Importar pasta de laudos</button>
       <button class="btn" type="button" data-docimp="it" hidden>Importar Inf. técnico</button>
       <button class="btn" type="button" data-docimp="fds" hidden>Importar FDS</button>
@@ -883,7 +895,7 @@ function showTab(t) {
   S.tab = t;
   TABS.forEach(x => { $('v-' + x).hidden = x !== t; const a = document.querySelector(`[data-tab="${x}"]`); a.setAttribute('aria-current', x === t ? 'page' : 'false'); a.href = hashFor(x); });
   if (t === 'registros') { ensureAll(); renderRegistros(); }
-  if (t === 'especificacoes') renderSpecs();
+  if (t === 'especificacoes') { if (S.perfil !== 'faturamento') ensureAll(); renderSpecs(); }
   if (t === 'laudos') { ensureAll(MODS.pa); renderLaudoList(); renderLaudo(); }
   if (t === 'validades') { ensureAll(MODS.mp); renderValidades(); }
   if (t === 'esp') renderEsp();
@@ -1459,6 +1471,7 @@ $('rExport').addEventListener('click', async () => {
 /* ---------- especificações ---------- */
 function renderSpecs() {
   const d = st(); const q = $('pBusca').value.trim().toUpperCase(), f = $('pFiltro').value;
+  const al2 = new Map(alertas2Anos(M.key).map(a => [a.id, a]));
   const faixas = M.fields.filter(x => x.tipo === 'faixa');
   const list = [...d.itens.entries()].map(([id, p]) => ({ id, ...p })).filter(p => {
     if (q && !(`${p.nome} ${p.codigo || ''}`.toUpperCase().includes(q))) return false;
@@ -1466,6 +1479,7 @@ function renderSpecs() {
     if (f === 'ativo' && p.ativo === false) return false;
     if (f === 'inativo' && p.ativo !== false) return false;
     if (f === 'semspec' && !none) return false;
+    if (f === '2anos' && !al2.has(p.id)) return false;
     return true;
   }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt', { numeric: true }));
   const rg = (a, b) => (a == null || b == null) ? '<span class="src">N/A</span>' : `${fmt(a)} – ${fmt(b)}`;
@@ -1474,7 +1488,7 @@ function renderSpecs() {
     : list.length ? list.map(p => `<tr data-id="${esc(p.id)}"><td>${esc(p.nome)}${p.codigo ? ` <span class="src">cód. ${esc(p.codigo)}</span>` : ''}</td>`
       + faixas.map(x => `<td class="v">${rg(p[x.mn], p[x.mx])}${x.copo && p[x.copo] ? ` <span class="src">${esc(p[x.copo])}${x.k === 'visc' && isBrook(p) ? ' (cP)' : ''}</span>` : ''}</td>`).join('')
       + M.specText.map(t => `<td>${esc(p[t.k] || '—')}</td>`).join('')
-      + `<td class="xspec">${(p.extras || []).map(e => `<div>${esc(e.nome)}: ${extraRange(e)}</div>`).join('') || '—'}</td>${M.laudo ? `<td>${laudosDe(p.nome).length ? `<button type="button" class="btn small" data-laudosmp="${esc(p.nome)}">${laudosDe(p.nome).length} PDFs</button>` : '<span class="src">—</span>'}</td>` : ''}${M.docs ? `<td>${docsCell(p)}</td>` : ''}<td><div class="row" style="gap:6px;flex-wrap:nowrap">${p.ativo === false ? '<span class="chip na">Inativo</span>' : '<span class="chip ok">Ativo</span>'}${podeExcluir() ? '<button type="button" class="btn small danger" data-delspec title="Excluir item">Excluir</button>' : ''}</div></td></tr>`).join('')
+      + `<td class="xspec">${(p.extras || []).map(e => `<div>${esc(e.nome)}: ${extraRange(e)}</div>`).join('') || '—'}</td>${M.laudo ? `<td>${laudosDe(p.nome).length ? `<button type="button" class="btn small" data-laudosmp="${esc(p.nome)}">${laudosDe(p.nome).length} PDFs</button>` : '<span class="src">—</span>'}</td>` : ''}${M.docs ? `<td>${docsCell(p)}</td>` : ''}<td><div class="row" style="gap:6px;flex-wrap:nowrap">${p.ativo === false ? '<span class="chip na">Inativo</span>' : '<span class="chip ok">Ativo</span>'}${al2.has(p.id) ? `<button type="button" class="chip pend" data-al2="${M.key}|${esc(p.id)}" title="Sem liberação há mais de 2 anos" style="cursor:pointer;border:0;white-space:nowrap">2 anos sem liberar</button>` : ''}${podeExcluir() ? '<button type="button" class="btn small danger" data-delspec title="Excluir item">Excluir</button>' : ''}</div></td></tr>`).join('')
     : `<tr><td colspan="${nc}" class="empty">${d.itens.size ? 'Nenhum item com esse filtro.' : `Nenhuma especificação cadastrada. Use ${esc(M.novo)} para incluir a primeira.`}</td></tr>`;
   $('pCount').textContent = `${list.length} de ${d.itens.size} ${M.itemPl}`;
   $('pPerm').textContent = podeEsp() ? 'Clique em uma linha para editar.' : podeIncluir() ? `Você pode incluir itens novos${M.docs ? ' e anexar Inf. técnico / FDS (clique na linha)' : ''}${M.laudo ? ' e importar laudos' : ''}. Alterar itens existentes: administrador e laboratório.` : 'Somente administrador e laboratório alteram especificações.';
@@ -1483,7 +1497,7 @@ function renderSpecs() {
 }
 $('pBusca').addEventListener('input', renderSpecs);
 $('pFiltro').addEventListener('change', renderSpecs);
-$('pBody').addEventListener('click', (e) => { if (e.target.closest('[data-laudosmp]')) return; const del = e.target.closest('[data-delspec]'); if (del && podeExcluir()) { specEditing = del.closest('tr').dataset.id; abrirExcl(); return; } const tr = e.target.closest('tr[data-id]'); if (tr && (podeEsp() || (M.docs && podeAnexar()))) openSpec(tr.dataset.id); });
+$('pBody').addEventListener('click', (e) => { if (e.target.closest('[data-laudosmp]')) return; const a2 = e.target.closest('[data-al2]'); if (a2) { abrir2Anos(a2.dataset.al2); return; } const del = e.target.closest('[data-delspec]'); if (del && podeExcluir()) { specEditing = del.closest('tr').dataset.id; abrirExcl(); return; } const tr = e.target.closest('tr[data-id]'); if (tr && (podeEsp() || (M.docs && podeAnexar()))) openSpec(tr.dataset.id); });
 $('pNovo').addEventListener('click', () => openSpec(null));
 
 let specEditing = null;
@@ -1627,6 +1641,7 @@ function rerender(mod) {
   if (S.tab === 'indicadores') { clearTimeout(IND.t); IND.t = setTimeout(renderIndicadores, 300); }
   if (mod.key === 'mp') { updateVencAlert(); if (S.tab === 'validades' && M.key === 'mp') renderValidades(); }
   if (mod.key !== M.key) return;
+  if (S.tab === 'especificacoes') { clearTimeout(IND.ts); IND.ts = setTimeout(renderSpecs, 300); }
   if (S.tab === 'laudos') renderLaudoList();
   if (!$('v-registros').hidden) renderRegistros();
   renderToday(); fillDatalists();
@@ -1740,7 +1755,7 @@ function startEsp() {
 
 
 /* ---------- Indicadores ---------- */
-const IND = { t: null };
+const IND = { t: null, ts: null };
 const IND_MODS = ['pa', 'pi', 'mp'];
 function indCorte() { const d = +$('indPer').value; if (!d) return ''; const x = new Date(hoje() + 'T12:00:00'); x.setDate(x.getDate() - d); return x.toISOString().slice(0, 10); }
 function indNovos(mods) {
@@ -1778,9 +1793,69 @@ function renderIndicadores() {
   const porMes = new Map(); nov.forEach(x => porMes.set(x.data.slice(0, 7), (porMes.get(x.data.slice(0, 7)) || 0) + 1));
   $('indNovN').textContent = `${nov.length} itens`;
   $('indNovMes').innerHTML = [...porMes.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12).map(([m, n]) => `<span class="tag" style="background:var(--surface-2,#eef3f4);border-radius:12px;padding:3px 10px;font-size:12px">${esc(mesLabel(m))}: <b>${n}</b></span>`).join('');
+  render2Anos(mods);
   $('indNovBody').innerHTML = nov.slice(0, 200).map(x => `<tr><td class="num">${dataBR(x.data)}</td><td>${esc(x.nome)}${x.ativo ? '' : ' <span class="src">(inativo)</span>'}</td><td>${esc(frOf(MODS[x.k]))}</td><td class="src">${esc(x.origem)}</td></tr>`).join('') || `<tr><td colspan="4" class="src">Nenhum item novo no período.</td></tr>`;
 }
 ['indPer', 'indMod'].forEach(id => $(id).addEventListener('change', renderIndicadores));
+
+
+/* ---------- Alerta: 2 anos sem liberação ---------- */
+const ANOS2 = 730;
+function diasEntre(a, b) { return Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5); }
+function tempoTxt(d) { const a = Math.floor(d / 365), m = Math.floor((d % 365) / 30.4); return a ? `${a} ano${a > 1 ? 's' : ''}${m ? ` e ${m} ${m > 1 ? 'meses' : 'mês'}` : ''}` : `${m} ${m > 1 ? 'meses' : 'mês'}`; }
+function alertas2Anos(k) {
+  const d = D[k]; if (!d.loaded || !allMonths(MODS[k]).length) return [];
+  const recs = allRecs('ALL', MODS[k]); if (!recs.length) return [];
+  const ult = new Map(); let ini = '';
+  recs.forEach(r => { if (!r.data || !r.produto) return; if (!ini || r.data < ini) ini = r.data; const id = slug(normNome(r.produto)); if (!ult.has(id) || r.data > ult.get(id)) ult.set(id, r.data); });
+  const espInc = new Map(); (ESP.revs || []).filter(r => r.mod === k && (r.tipo === 'inclusao' || r.tipo === 'reinclusao') && r.item).forEach(r => { const id = slug(normNome(r.item)); const x = (r.data || '').slice(0, 10); if (x && (!espInc.has(id) || x > espInc.get(id))) espInc.set(id, x); });
+  const h = hoje(), out = [];
+  d.itens.forEach((it, id) => {
+    if (it.ativo === false || it.alerta2Off) return;
+    if (it.alerta2Ate && it.alerta2Ate > h) return;
+    const u = ult.get(id) || '';
+    const base = [u, it.criadoEm ? String(it.criadoEm).slice(0, 10) : '', espInc.get(id) || '', u ? '' : ini].filter(Boolean).sort().pop();
+    if (!base || diasEntre(base, h) < ANOS2) return;
+    out.push({ k, id, nome: it.nome || id, ult: u, dias: diasEntre(base, h), ini });
+  });
+  return out.sort((a, b) => b.dias - a.dias || a.nome.localeCompare(b.nome));
+}
+function render2Anos(mods) {
+  const all = mods.flatMap(k => alertas2Anos(k)), pode = podeEsp();
+  $('ind2N').textContent = `${all.length} itens`;
+  $('ind2Info').textContent = all.length ? `Itens ativos sem nenhuma liberação nos últimos 2 anos.${pode ? ' Clique em "Avaliar" para decidir se o item deve ser inativado.' : ' Só administrador e laboratório podem inativar ou desativar o alerta.'}` : 'Nenhum item ativo está há 2 anos sem liberação.';
+  $('ind2Body').innerHTML = all.slice(0, 300).map(a => `<tr><td>${esc(a.nome)}</td><td>${esc(frOf(MODS[a.k]))}</td><td class="num">${a.ult ? dataBR(a.ult) : `<span class="src">nenhuma desde ${dataBR(a.ini)}</span>`}</td><td>${tempoTxt(a.dias)}</td><td>${pode ? `<button type="button" class="btn small" data-al2="${a.k}|${esc(a.id)}">Avaliar</button>` : ''}</td></tr>`).join('');
+}
+$('ind2Body').addEventListener('click', (e) => { const b = e.target.closest('[data-al2]'); if (b) abrir2Anos(b.dataset.al2); });
+let A2 = null;
+function abrir2Anos(key) {
+  if (!podeEsp()) { toast('Só administrador e laboratório podem avaliar este alerta.'); return; }
+  const [k, id] = key.split('|'); const a = alertas2Anos(k).find(x => x.id === id); const it = D[k].itens.get(id); if (!a || !it) return;
+  A2 = { k, id };
+  $('a2Sub').textContent = `${frOf(MODS[k])} · sem liberação há 2 anos`; $('a2Nome').textContent = it.nome || id;
+  $('a2Info').textContent = a.ult ? `Última liberação em ${dataBR(a.ult)} — há ${tempoTxt(a.dias)}.` : `Nenhuma liberação registrada desde ${dataBR(a.ini)} (início do histórico).`;
+  $('a2Motivo').value = 'Sem liberação há mais de 2 anos'; $('a2Err').hidden = true;
+  $('d2Anos').showModal();
+}
+async function salvar2Anos(extra, tipoEsp) {
+  const { k, id } = A2; const old = D[k].itens.get(id); if (!old) return;
+  const doc = { ...old, ...extra, atualizadoEm: new Date().toISOString(), atualizadoPor: S.uid || null };
+  Object.keys(doc).forEach(x => { if (x.startsWith('_')) delete doc[x]; });
+  ['a2Sim', 'a2Nao', 'a2Off'].forEach(b => $(b).disabled = true);
+  try {
+    await S.db.collection(MODS[k].col.itens).doc(id).set(doc); D[k].itens.set(id, doc);
+    if (tipoEsp) { try { await espLog(k, tipoEsp, doc.nome || id, '', null, null, $('a2Motivo').value.trim()); } catch { toast('Item inativado, mas a revisão da ESP não foi registrada.'); } }
+    $('d2Anos').close(); return true;
+  } catch { $('a2Err').textContent = 'Não foi possível salvar. Verifique a conexão.'; $('a2Err').hidden = false; return false; }
+  finally { ['a2Sim', 'a2Nao', 'a2Off'].forEach(b => $(b).disabled = false); if (S.tab === 'indicadores') renderIndicadores(); if (S.tab === 'especificacoes') renderSpecs(); }
+}
+$('a2Form').addEventListener('submit', async (e) => {
+  e.preventDefault(); if (!A2) return;
+  if (!$('a2Motivo').value.trim()) { $('a2Motivo').focus(); $('a2Err').textContent = 'Informe o motivo da revisão da ESP.'; $('a2Err').hidden = false; return; }
+  if (await salvar2Anos({ ativo: false, alerta2: { acao: 'inativado', em: hoje(), por: ACC.me?.nome || '' } }, 'exclusao')) toast('Item inativado · revisão da ESP registrada');
+});
+$('a2Nao').addEventListener('click', async () => { const x = new Date(); x.setFullYear(x.getFullYear() + 1); const ate = x.toISOString().slice(0, 10); if (await salvar2Anos({ alerta2Ate: ate, alerta2: { acao: 'mantido', em: hoje(), por: ACC.me?.nome || '' } })) toast(`Item mantido · o aviso volta em ${dataBR(ate)} se continuar sem liberação`); });
+$('a2Off').addEventListener('click', async () => { if (await salvar2Anos({ alerta2Off: true, alerta2: { acao: 'alerta desativado', em: hoje(), por: ACC.me?.nome || '' } })) toast('Alerta desativado para este item'); });
 
 /* ---------- Excel da ESP ---------- */
 let XLSXP = null;
