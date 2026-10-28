@@ -63,3 +63,59 @@ jobs:
             zgrep -q "CREATE TABLE public.$T " out/banco_sistema.sql.gz || { echo "::error::Tabela $T ausente no dump"; exit 1; }
           done
           echo "DUMP_OK $D"
+
+      - name: Instalar e configurar rclone (Google Drive)
+        env:
+          RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
+        run: |
+          curl -fsSL https://rclone.org/install.sh | sudo bash >/dev/null 2>&1 || true
+          rclone version | head -1
+          mkdir -p ~/.config/rclone
+          printf '%s\n' "$RCLONE_CONF" | tr -d '\r' > ~/.config/rclone/rclone.conf
+          grep -q '^\[gdrive\]' ~/.config/rclone/rclone.conf || { echo "::error::RCLONE_CONF sem a secao [gdrive]"; exit 1; }
+          rclone lsd "gdrive:Backup Quimicer" >/dev/null && echo "Drive OK"
+
+      - name: Etapa 5 - PDFs anexados (espelho no Drive)
+        env:
+          PGPASSWORD: ${{ secrets.BACKUP_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          P=$(printf '%s\n' "$PGPASSWORD" | tr -d '\r' | grep -E '^[A-Za-z0-9]{32}$' | head -1 || true)
+          [ -n "$P" ] && export PGPASSWORD="$P"
+          DEST="gdrive:Backup Quimicer/arquivos/laudos-mp"
+          /usr/lib/postgresql/17/bin/psql "$PGCONN" -Atc "select name||'|'||coalesce(metadata->>'size','0') from storage.objects where bucket_id='laudos-mp' and name not like '%/.emptyFolderPlaceholder' order by name" > out/objetos.txt
+          rclone lsf -R --files-only --format ps --separator '|' "$DEST" > remoto.txt 2>/dev/null || : > remoto.txt
+          python3 - <<'PY'
+          import os, json, urllib.request, pathlib, concurrent.futures as cf
+          key = os.environ['PGPASSWORD']
+          url = 'https://' + os.environ['PROJ'] + '.supabase.co/functions/v1/backup-arquivos'
+          objs = [l.rstrip('\n').rsplit('|', 1) for l in open('out/objetos.txt') if '|' in l]
+          rem = dict(l.rstrip('\n').rsplit('|', 1) for l in open('remoto.txt') if '|' in l)
+          falt = [n for n, s in objs if rem.get(n) != s]
+          print(f'{len(objs)} arquivos no Supabase; {len(rem)} ja no Drive; {len(falt)} novos/alterados para copiar')
+          def sign(paths):
+              r = urllib.request.Request(url, data=json.dumps({'bucket': 'laudos-mp', 'paths': paths}).encode(),
+                                         headers={'x-backup-key': key, 'content-type': 'application/json'})
+              return json.load(urllib.request.urlopen(r, timeout=60))
+          def get(it):
+              p = pathlib.Path('dl') / it['path']; p.parent.mkdir(parents=True, exist_ok=True)
+              err = None
+              for _ in range(3):
+                  try:
+                      with urllib.request.urlopen(it['url'], timeout=120) as r: p.write_bytes(r.read())
+                      return 1
+                  except Exception as e: err = e
+              print('ERRO', it['path'], err); return 0
+          ok = erros = 0
+          for i in range(0, len(falt), 100):
+              lote = sign(falt[i:i + 100])
+              boas = [x for x in lote if x.get('url')]
+              with cf.ThreadPoolExecutor(8) as ex: res = list(ex.map(get, boas))
+              ok += sum(res); erros += len(lote) - sum(res)
+          print(f'Baixados: {ok}  Erros: {erros}')
+          open('out/arquivos_resumo.txt', 'w').write(f'{len(objs)};{ok};{erros}\n')
+          if erros: raise SystemExit(1)
+          PY
+          if [ -d dl ]; then rclone copy dl "$DEST" --transfers 8 --stats-one-line --stats 30s; fi
+          echo "Conferencia no Drive: $(rclone lsf -R --files-only "$DEST" | wc -l) arquivos"
+          echo "PDFS_OK"
