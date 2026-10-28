@@ -293,7 +293,7 @@ dl.kv dd { margin: 0; min-width: 0 }
 html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% } img { max-width: 100% }
 .gate a { color: var(--accent) } .gate a:hover { text-decoration: none }
 </style>
-<script>window.APP_BUILD = '28/10/2026 15:26';</script>
+<script>window.APP_BUILD = '28/10/2026 15:33';</script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 </head>
@@ -527,6 +527,8 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
             <label class="row" id="lConfRow" hidden style="font-size:13px"><input type="checkbox" id="lConf"> <span>Confirmo a emissão mesmo com parâmetro fora da especificação.</span></label>
             <div class="err" id="lErr" hidden></div>
             <div class="row" style="justify-content:flex-end">
+              <button type="button" class="btn danger" id="lExcluir" hidden>Excluir laudo</button>
+              <button type="button" class="btn" id="lSalvarEd" hidden title="Grava as correções no laudo emitido sem baixar o PDF">Salvar alterações</button>
               <button type="button" class="btn" id="lEnviar" data-lab>Enviar para o faturamento</button>
               <button type="button" class="btn primary" id="lGerar" disabled>Emitir laudo em PDF</button>
             </div>
@@ -652,6 +654,14 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
     <div class="src">Inativar: o item sai da lista de liberação e a ESP registra a exclusão; pode ser reativado depois nas especificações. Não inativar: o aviso volta daqui a 1 ano se continuar sem liberação. Desativar alerta: o aviso não aparece mais para este item.</div>
     <div class="err" id="a2Err" hidden></div>
     <div class="row" style="justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn" id="a2Off">Desativar alerta</button><button type="button" class="btn" id="a2Nao">Não inativar</button><button type="submit" class="btn danger" id="a2Sim">Sim, inativar</button></div>
+  </div></form></dialog>
+<dialog id="dLdDel"><form id="ldDelForm" novalidate>
+  <div class="hd"><div><div class="label">Excluir laudo</div><h2 style="font-size:22px" id="ldDelNome"></h2></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
+  <div class="bd" style="display:flex;flex-direction:column;gap:12px">
+    <div class="lwarn nc">O laudo sai do histórico e da fila e não pode ser recuperado pelo app (só pelo backup do Google Drive). O registro de liberação do lote não muda.</div>
+    <div id="ldDelInfo" class="src"></div>
+    <div class="err" id="ldDelErr" hidden></div>
+    <div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn danger" id="ldDelGo">Excluir definitivamente</button></div>
   </div></form></dialog>
 <dialog id="dExcl"><form id="exForm" novalidate>
   <div class="hd"><div><div class="label" id="exLabel">Excluir item da especificação</div><h2 style="font-size:22px" id="exNome"></h2></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
@@ -2984,6 +2994,7 @@ function renderLaudo() {
   $('lEnviar').disabled = !!bSend || h?.status === 'emitido'; $('lEnviar').title = bSend;
   $('lEnviar').textContent = h && h.status !== 'emitido' ? 'Salvar alterações na fila' : 'Enviar para o faturamento';
   $('lGerar').disabled = !!bEmit; $('lGerar').title = bEmit;
+  $('lExcluir').hidden = !(S.dev && h?.id); $('lSalvarEd').hidden = !(S.dev && h?.id && h.status === 'emitido'); $('lSalvarEd').disabled = !!bSend;
   $('sheetIn').innerHTML = `<img src="${LOGO}" alt="Quimicer"><div class="t1">LAUDO TÉCNICO</div><div class="t2">${esc(L.produto || 'PRODUTO')}</div>
     <div class="cli">CLIENTE: ${esc(L.cliente || '-')}</div>
     <div class="nf"><span>NF</span><span>${esc(L.nf)}</span></div>
@@ -3024,10 +3035,11 @@ async function savePdf(L) {
   try { await S.downloads.save({ filename: fn, data }); return true; }
   catch (x) { if (x?.code === 'declined') return false; throw { msg: 'Não foi possível baixar o PDF.' }; }
 }
-async function writeLaudo(status) {
+async function writeLaudo(status, manterEmissao) {
   const L = laudoData(), r = LZ.rec, now = new Date().toISOString();
   const base = { ...L, recId: r?._id || LZ.cur?.recId || null, recMes: r?._mes || LZ.cur?.recMes || null, status, atualizadoEm: now, atualizadoPor: S.uid || null, confirmadoForaSpec: !!$('lConf').checked || !!LZ.cur?.confirmadoForaSpec };
-  if (status === 'emitido') { base.emitidoEm = now; base.emitidoPor = S.uid || null; }
+  if (status === 'emitido' && !(manterEmissao && LZ.cur?.emitidoEm)) { base.emitidoEm = now; base.emitidoPor = S.uid || null; }
+  if (manterEmissao) { base.editadoEm = now; base.editadoPor = S.uid || null; }
   if (LZ.cur?.id) { await S.db.collection('laudos').doc(LZ.cur.id).update(base); return { ...LZ.cur, ...base }; }
   base.preparadoEm = now; base.preparadoPor = S.uid || null;
   const ref = await S.db.collection('laudos').add(base); return { ...base, id: ref.id };
@@ -3087,7 +3099,7 @@ function renderEmitidos() {
   const kpi = (v, l) => `<div class="panel" style="padding:12px 16px"><div style="font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1.1">${v}</div><div class="label" style="margin-top:4px">${l}</div></div>`;
   $('leKpis').innerHTML = kpi(list.length, 'Laudos') + kpi(kg || '—', 'Quantidade total') + kpi(new Set(list.map(h => h.cliente).filter(Boolean)).size, 'Clientes') + kpi(new Set(list.map(h => normNome(h.produto))).size, 'Produtos');
   $('leBody').innerHTML = list.slice(0, 500).map(h => { const em = (h.status || 'emitido') === 'emitido';
-    return `<tr data-lid="${esc(h.id)}"><td class="num">${dt(h._d)}</td><td>${esc(h.produto)}</td><td class="mono">${esc(h.lote)}</td><td>${esc(h.cliente || '—')}</td><td class="mono">${esc(h.nf || '—')}</td><td class="num" style="text-align:right">${h.qtd ? esc(qtdTxt(h.qtd, h.un)) : '—'}</td><td class="num">${dataBR(h.dataEntrega)}</td><td>${em ? '<span class="chip ok">Emitido</span>' : '<span class="chip pend">Aguardando</span>'}</td><td>${em ? `<button type="button" class="btn small" data-dl="${esc(h.id)}">PDF</button>` : ''}</td></tr>`; }).join('')
+    return `<tr data-lid="${esc(h.id)}"><td class="num">${dt(h._d)}</td><td>${esc(h.produto)}</td><td class="mono">${esc(h.lote)}</td><td>${esc(h.cliente || '—')}</td><td class="mono">${esc(h.nf || '—')}</td><td class="num" style="text-align:right">${h.qtd ? esc(qtdTxt(h.qtd, h.un)) : '—'}</td><td class="num">${dataBR(h.dataEntrega)}</td><td>${em ? '<span class="chip ok">Emitido</span>' : '<span class="chip pend">Aguardando</span>'}</td><td><div class="row" style="gap:6px;flex-wrap:nowrap">${em ? `<button type="button" class="btn small" data-dl="${esc(h.id)}">PDF</button>` : ''}${S.dev ? `<button type="button" class="btn small" data-ldedit="${esc(h.id)}">Editar</button><button type="button" class="btn small danger" data-lddel="${esc(h.id)}">Excluir</button>` : ''}</div></td></tr>`; }).join('')
     || `<tr><td colspan="9" class="empty">${LZ.all.length ? 'Nenhum laudo com esses filtros.' : 'Nenhum laudo emitido ainda.'}</td></tr>`;
   $('leCount').textContent = `${list.length} laudo(s)${list.length > 500 ? ' · mostrando os 500 mais recentes' : ''}`;
 }
@@ -3111,6 +3123,7 @@ function setLaudoView(v) {
 document.querySelector('.lnav').addEventListener('click', (e) => { const b = e.target.closest('[data-lv]'); if (b) setLaudoView(b.dataset.lv); });
 $('lPend').addEventListener('click', (e) => { const b = e.target.closest('[data-lid]'); if (!b) return; const h = LZ.all.find(x => x.id === b.dataset.lid); if (h) { openLaudoDoc(h); setLaudoView('emitir'); } });
 $('leBody').addEventListener('click', async (e) => {
+  const del = e.target.closest('[data-lddel]'); if (del) { const h = LZ.all.find(x => x.id === del.dataset.lddel); if (h) abrirLdDel(h); return; }
   const b = e.target.closest('[data-dl]');
   if (b) { const h = LZ.all.find(x => x.id === b.dataset.dl); try { await savePdf(h); } catch (x) { toast(x?.msg || 'Não foi possível baixar o PDF.'); } return; }
   const tr = e.target.closest('tr[data-lid]'); if (!tr) return;
@@ -3127,6 +3140,35 @@ function startLaudos() {
   $('lSalvarResp').hidden = !podeEsp();
 }
 renderEns(); renderLaudo();
+
+
+/* ---------- desenvolvedor: excluir / editar laudos ---------- */
+let LDDEL = null;
+function abrirLdDel(h) {
+  if (!S.dev || !h) return; LDDEL = h;
+  $('ldDelNome').textContent = `${h.produto} · lote ${h.lote}`;
+  $('ldDelInfo').textContent = `Cliente: ${h.cliente || '—'} · NF ${h.nf || '—'} · ${(h.status || 'emitido') === 'emitido' ? 'emitido em ' + dt(h.emitidoEm) : 'aguardando faturamento'}`;
+  $('ldDelErr').hidden = true; $('dLdDel').showModal();
+}
+$('lExcluir').addEventListener('click', () => abrirLdDel(LZ.cur));
+$('ldDelForm').addEventListener('submit', async (e) => {
+  e.preventDefault(); if (!S.dev || !LDDEL?.id) return;
+  $('ldDelGo').disabled = true;
+  try {
+    await S.db.collection('laudos').doc(LDDEL.id).delete();
+    LZ.all = LZ.all.filter(x => x.id !== LDDEL.id);
+    if (LZ.cur?.id === LDDEL.id) clearLaudo();
+    $('dLdDel').close(); toast(`Laudo do lote ${LDDEL.lote} excluído`); renderPend(); renderLaudo();
+  } catch { $('ldDelErr').textContent = 'Não foi possível excluir. Só o desenvolvedor exclui laudos.'; $('ldDelErr').hidden = false; }
+  finally { $('ldDelGo').disabled = false; }
+});
+$('lSalvarEd').addEventListener('click', async () => {
+  if (!S.dev || !LZ.cur?.id || $('lSalvarEd').disabled) return; lErr('');
+  $('lSalvarEd').disabled = true;
+  try { LZ.cur = await writeLaudo('emitido', true); toast('Alterações salvas no laudo'); }
+  catch { lErr('Não foi possível salvar as alterações.'); }
+  finally { renderLaudo(); renderPend(); }
+});
 
 /* ---------- Supabase: login, perfis e banco de dados ---------- */
 const PERFIS = { desenvolvedor: 'Desenvolvedor', administrador: 'Administrador', laboratorio: 'Laboratório', faturamento: 'Faturamento', qualidade: 'Qualidade' };
@@ -3329,7 +3371,7 @@ function collRef(path, opts = {}) {
           else if (c.kind === 'itens') must(await SB.from('itens').delete().eq('modulo', c.modulo).eq('id', id));
           else if (c.kind === 'esp') { const r = must(await SB.from('esp_revisoes').delete().eq('id', id).select('id')); if (!r.length) throw dbErr({ code: '42501', message: 'sem permissão' }); }
           else if (c.kind === 'rnc') { const r = must(await SB.from('rnc').delete().eq('id', id).select('id')); if (!r.length) throw dbErr({ code: '42501', message: 'sem permissão' }); }
-          else must(await SB.from('laudos').delete().eq('id', id));
+          else { const r = must(await SB.from('laudos').delete().eq('id', id).select('id')); if (!r.length) throw dbErr({ code: '42501', message: 'sem permissão' }); }
           kickAll();
         },
       };
