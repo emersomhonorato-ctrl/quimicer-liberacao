@@ -304,6 +304,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       <a href="#especificacoes" data-tab="especificacoes">Especificações</a>
       <a href="#esp" data-tab="esp">Revisões ESP</a>
       <a href="#rnc" data-tab="rnc">RNC</a>
+      <a href="#indicadores" data-tab="indicadores">Indicadores</a>
       <a href="#laudos" data-tab="laudos" id="tabLaudos">Laudos</a>
       <a href="#validades" data-tab="validades" id="tabVal" hidden>Validades</a>
     </nav>
@@ -535,6 +536,23 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       <div class="field"><label for="rncMod">Formulário</label><select id="rncMod"><option value="">Todos</option><option value="pa">FR 002 · Produto acabado</option><option value="pi">FR 011 · Intermediário</option><option value="mp">FR 001 · Matéria-prima</option></select></div></div>
     <div class="tablebox"><table class="grid" style="min-width:900px"><thead><tr><th>RNC Nº</th><th>Data</th><th>FR</th><th>Item</th><th>Lote</th><th>Não conformidade</th><th>Situação</th><th>Responsável</th><th></th></tr></thead><tbody id="rncBody"></tbody></table></div>
     <div class="foot"><span id="rncCount"></span><span>Cada liberação registrada fora da especificação abre uma RNC automaticamente. As antigas aparecem na lista acima para abrir quando quiser.</span></div>
+  </section>
+  <section class="view" id="v-indicadores" hidden>
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px">
+      <div><div class="label">Indicadores</div><div style="font-family:var(--f-display);font-weight:700;font-size:28px;line-height:1.1">Produtos e liberações</div><div class="src" id="indSub">Carregando…</div></div>
+      <div class="row" style="gap:10px;align-items:flex-end">
+        <div class="field"><label for="indPer">Período</label><select id="indPer"><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="365" selected>Últimos 12 meses</option><option value="0">Todo o histórico</option></select></div>
+        <div class="field"><label for="indMod">Formulário</label><select id="indMod"><option value="">Todos</option><option value="pa">FR 002 · Produto acabado</option><option value="pi">FR 011 · Intermediário</option><option value="mp">FR 001 · Matéria-prima</option></select></div>
+      </div>
+    </div>
+    <div id="indKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px"></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(420px,100%),1fr));gap:14px;align-items:start">
+      <div class="panel"><div class="hd"><span class="label">Produtos mais liberados</span><span class="src" id="indTopN"></span></div>
+        <div class="bd" style="padding-top:6px"><div style="overflow-x:auto;max-height:460px"><table class="acc"><thead><tr><th>#</th><th>Item</th><th>Form.</th><th style="text-align:right">Liberações</th><th style="text-align:right">% do total</th><th>Última</th></tr></thead><tbody id="indTopBody"></tbody></table></div></div></div>
+      <div class="panel"><div class="hd"><span class="label">Produtos novos cadastrados</span><span class="src" id="indNovN"></span></div>
+        <div class="bd" style="padding-top:6px"><div id="indNovMes" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div><div style="overflow-x:auto;max-height:400px"><table class="acc"><thead><tr><th>Data</th><th>Item</th><th>Form.</th><th>Origem da data</th></tr></thead><tbody id="indNovBody"></tbody></table></div>
+        <div class="src" style="margin-top:8px">A data vem do cadastro no app; para itens antigos, da inclusão na ESP ou da 1ª liberação.</div></div></div>
+    </div>
   </section>
 
 <dialog id="dRnc" style="width:min(960px,calc(100vw - 16px))"><form id="rncForm" novalidate>
@@ -831,7 +849,7 @@ function banner(msg) { const b = $('banner'); b.textContent = msg || ''; b.hidde
 function conn(state, txt) { $('connDot').className = 'dot ' + (state || ''); $('connTxt').textContent = txt; }
 
 /* ---------- navigation ---------- */
-const TABS = ['liberar', 'registros', 'especificacoes', 'esp', 'rnc', 'laudos', 'validades'];
+const TABS = ['liberar', 'registros', 'especificacoes', 'esp', 'rnc', 'indicadores', 'laudos', 'validades'];
 const hashFor = (tab) => '#' + (M.key === 'pa' ? '' : M.key + '-') + tab;
 function route() {
   const h = location.hash.slice(1);
@@ -849,7 +867,7 @@ document.addEventListener('click', (e) => {
 });
 document.querySelectorAll('[data-mod]').forEach(b => b.addEventListener('click', () => { if (b.dataset.mod !== M.key) { setModule(b.dataset.mod, true); history.replaceState(null, '', hashFor(S.tab)); showTab(S.tab); } }));
 
-const QUAL_TABS = ['especificacoes', 'esp', 'rnc'];
+const QUAL_TABS = ['especificacoes', 'esp', 'rnc', 'indicadores'];
 function tabOk(t) {
   const p = S.perfil;
   if (p === 'faturamento') return t === 'laudos';
@@ -870,6 +888,7 @@ function showTab(t) {
   if (t === 'validades') { ensureAll(MODS.mp); renderValidades(); }
   if (t === 'esp') renderEsp();
   if (t === 'rnc') { ['pa', 'pi', 'mp'].forEach(k => { startModule(k); if (S.perfil !== 'qualidade') ensureAll(MODS[k]); }); startRnc(); renderRnc(); }
+  if (t === 'indicadores') { ['pa', 'pi', 'mp'].forEach(k => { startModule(k); ensureAll(MODS[k]); }); startEsp(); renderIndicadores(); }
 }
 function setModule(key, user) {
   M = MODS[key]; store.set('fr.mod', key);
@@ -1550,6 +1569,7 @@ $('specForm').addEventListener('submit', async (e) => {
   const nome = normNome($('sNome').value); if (!nome) return err('Informe o nome.');
   const old = specEditing ? st().itens.get(specEditing) : {};
   const doc = { ...old, nome, ativo: $('sAtivo').value === '1', atualizadoEm: new Date().toISOString(), atualizadoPor: S.uid || null };
+  if (!specEditing && !doc.criadoEm) { doc.criadoEm = hoje(); doc.criadoPor = ACC.me?.nome || ''; }
   if (M.codigo) doc.codigo = $('sCodigo').value.trim();
   try {
     M.fields.filter(f => f.tipo === 'faixa').forEach(f => {
@@ -1604,6 +1624,7 @@ document.querySelectorAll('dialog [data-close]').forEach(b => b.addEventListener
 
 /* ---------- data ---------- */
 function rerender(mod) {
+  if (S.tab === 'indicadores') { clearTimeout(IND.t); IND.t = setTimeout(renderIndicadores, 300); }
   if (mod.key === 'mp') { updateVencAlert(); if (S.tab === 'validades' && M.key === 'mp') renderValidades(); }
   if (mod.key !== M.key) return;
   if (S.tab === 'laudos') renderLaudoList();
@@ -1714,8 +1735,52 @@ $('espForm').addEventListener('submit', async (e) => {
 });
 function startEsp() {
   if (ESP.started || !S.db) return; ESP.started = true;
-  S.db.collection('esp_revisoes').onSnapshot((snap) => { ESP.revs = snap.docs.map(x => ({ ...x.data(), _id: x.id })); ESP.loaded = true; if (S.tab === 'esp') renderEsp(); }, () => { ESP.loaded = true; });
+  S.db.collection('esp_revisoes').onSnapshot((snap) => { ESP.revs = snap.docs.map(x => ({ ...x.data(), _id: x.id })); ESP.loaded = true; if (S.tab === 'esp') renderEsp(); if (S.tab === 'indicadores') renderIndicadores(); }, () => { ESP.loaded = true; });
 }
+
+
+/* ---------- Indicadores ---------- */
+const IND = { t: null };
+const IND_MODS = ['pa', 'pi', 'mp'];
+function indCorte() { const d = +$('indPer').value; if (!d) return ''; const x = new Date(hoje() + 'T12:00:00'); x.setDate(x.getDate() - d); return x.toISOString().slice(0, 10); }
+function indNovos(mods) {
+  const espInc = new Map(); (ESP.revs || []).filter(r => r.tipo === 'inclusao' && r.item).forEach(r => { const k = (r.mod || 'pa') + '|' + slug(normNome(r.item)); const d = (r.data || r.em || '').slice(0, 10); if (d && (!espInc.has(k) || d < espInc.get(k))) espInc.set(k, d); });
+  const out = [];
+  mods.forEach(k => {
+    const prim = new Map(); allRecs('ALL', MODS[k]).forEach(r => { if (!r.data || !r.produto) return; const id = slug(normNome(r.produto)); if (!prim.has(id) || r.data < prim.get(id)) prim.set(id, r.data); });
+    D[k].itens.forEach((it, id) => {
+      let data = '', origem = '';
+      if (it.criadoEm) { data = String(it.criadoEm).slice(0, 10); origem = 'Cadastro no app'; }
+      else if (espInc.get(k + '|' + id)) { data = espInc.get(k + '|' + id); origem = 'Inclusão na ESP'; }
+      else if (prim.get(id)) { data = prim.get(id); origem = '1ª liberação'; }
+      if (data) out.push({ k, nome: it.nome || id, data, origem, ativo: it.ativo !== false });
+    });
+  });
+  return out;
+}
+function renderIndicadores() {
+  if ($('v-indicadores').hidden) return;
+  const mf = $('indMod').value, mods = mf ? [mf] : IND_MODS, corte = indCorte();
+  const carregando = mods.some(k => !D[k].loaded);
+  const recs = mods.flatMap(k => allRecs('ALL', MODS[k]).filter(r => r.data && r.produto && (!corte || r.data >= corte)).map(r => ({ ...r, _k: k })));
+  const cont = new Map();
+  recs.forEach(r => { const key = r._k + '|' + slug(normNome(r.produto)); const c = cont.get(key) || { k: r._k, nome: normNome(r.produto), n: 0, ult: '' }; c.n++; if (r.data > c.ult) c.ult = r.data; cont.set(key, c); });
+  const top = [...cont.values()].sort((a, b) => b.n - a.n || a.nome.localeCompare(b.nome));
+  const tot = recs.length || 1;
+  const nov = indNovos(mods).filter(x => !corte || x.data >= corte).sort((a, b) => b.data.localeCompare(a.data) || a.nome.localeCompare(b.nome));
+  const nItens = mods.reduce((s, k) => s + [...D[k].itens.values()].filter(i => i.ativo !== false).length, 0);
+  const perTxt = $('indPer').selectedOptions[0].textContent.toLowerCase();
+  $('indSub').textContent = carregando ? 'Carregando registros…' : `${recs.length} liberações ${corte ? 'nos ' + perTxt : 'em todo o histórico'}`;
+  const kpi = (v, l, sub) => `<div class="panel" style="padding:14px 16px"><div style="font-family:var(--f-display);font-weight:700;font-size:26px;line-height:1.1">${v}</div><div class="label" style="margin-top:4px">${l}</div>${sub ? `<div class="src">${sub}</div>` : ''}</div>`;
+  $('indKpis').innerHTML = kpi(recs.length, 'Liberações', corte ? perTxt : 'todo o histórico') + kpi(cont.size, 'Itens liberados', 'com ao menos 1 lote') + kpi(nov.length, 'Itens novos', corte ? perTxt : 'todo o histórico') + kpi(nItens, 'Itens ativos', 'cadastrados nas especificações');
+  $('indTopN').textContent = top.length ? `${top.length} itens` : '';
+  $('indTopBody').innerHTML = top.slice(0, 30).map((c, i) => `<tr><td class="num">${i + 1}</td><td>${esc(c.nome)}</td><td>${esc(frOf(MODS[c.k]))}</td><td class="num" style="text-align:right">${c.n}</td><td class="num" style="text-align:right">${fmt(Math.round(c.n / tot * 1000) / 10)}%</td><td class="num">${dataBR(c.ult)}</td></tr>`).join('') || `<tr><td colspan="6" class="src">${carregando ? 'Carregando…' : 'Nenhuma liberação no período.'}</td></tr>`;
+  const porMes = new Map(); nov.forEach(x => porMes.set(x.data.slice(0, 7), (porMes.get(x.data.slice(0, 7)) || 0) + 1));
+  $('indNovN').textContent = `${nov.length} itens`;
+  $('indNovMes').innerHTML = [...porMes.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12).map(([m, n]) => `<span class="tag" style="background:var(--surface-2,#eef3f4);border-radius:12px;padding:3px 10px;font-size:12px">${esc(mesLabel(m))}: <b>${n}</b></span>`).join('');
+  $('indNovBody').innerHTML = nov.slice(0, 200).map(x => `<tr><td class="num">${dataBR(x.data)}</td><td>${esc(x.nome)}${x.ativo ? '' : ' <span class="src">(inativo)</span>'}</td><td>${esc(frOf(MODS[x.k]))}</td><td class="src">${esc(x.origem)}</td></tr>`).join('') || `<tr><td colspan="4" class="src">Nenhum item novo no período.</td></tr>`;
+}
+['indPer', 'indMod'].forEach(id => $(id).addEventListener('change', renderIndicadores));
 
 /* ---------- Excel da ESP ---------- */
 let XLSXP = null;
