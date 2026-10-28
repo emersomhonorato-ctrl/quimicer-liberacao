@@ -2227,7 +2227,7 @@ const DOCT = { it: 'Informativo técnico', fds: 'FDS' };
 const DOCS = { map: new Map(), started: false };
 const docKey = (nome) => 'pa-' + slug(normNome(nome));
 function docsDe(nome, tipo) { const d = DOCS.map.get(docKey(nome)); return ((d && d[tipo]) || []).slice().sort((a, b) => (b.data || b.em || '').localeCompare(a.data || a.em || '')); }
-function docLink(a, txt, cls) { return `<a href="/_blob/${esc(a.id)}" target="_blank" rel="noopener" title="${esc(a.nome)}"${cls ? ` class="${cls}" style="text-decoration:none"` : ''}>${esc(txt || a.nome)}</a>`; }
+function docLink(a, txt, cls) { return `<a href="/_blob/${esc(a.id)}" target="_blank" rel="noopener" title="${esc(a.nome)}"${cls ? ` class="${cls}" style="text-decoration:none;color:var(--ink)"` : ''}>${esc(txt || a.nome)}</a>`; }
 function docsCell(p) {
   const out = ['it', 'fds'].map(t => { const l = docsDe(p.nome, t); return l.length ? `<span style="white-space:nowrap;display:inline-flex;gap:4px;align-items:center">${docLink(l[0], t === 'it' ? 'IT' : 'FDS', 'btn small')}${l.length > 1 ? ` <button type="button" class="btn small" data-docs="${esc(p.nome)}" data-tipo="${t}" title="Versões anteriores">+${l.length - 1}</button>` : ''}</span>` : ''; }).filter(Boolean);
   return out.length ? `<div class="row" style="gap:6px;flex-wrap:nowrap">${out.join('')}</div>` : '<span class="src">—</span>';
