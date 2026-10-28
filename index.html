@@ -181,6 +181,13 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 13px; min-width:
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
 .pdf { display: inline-block; font-family: var(--f-display); font-weight: 600; font-size: 12px; letter-spacing: .04em; padding: 1px 7px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); text-decoration: none }
 .pdf.ref { background: var(--na-soft); color: var(--na); cursor: help }
+.lnav { display: inline-flex; gap: 4px; background: var(--soft); border-radius: 10px; padding: 4px; margin-bottom: 16px; flex-wrap: wrap }
+.lnav button { border: 0; background: transparent; padding: 9px 16px; border-radius: 7px; font-weight: 600; cursor: pointer; color: var(--muted); font-size: 15px }
+.lnav button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08) }
+.lnav .cnt { display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; margin-left: 4px }
+.lnav .cnt:empty { display: none }
+details.lcfg summary { cursor: pointer; list-style: revert }
+#leBody tr { cursor: pointer }
 .laudos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 20px; align-items: start }
 .lresults { display: flex; flex-direction: column; margin-top: 10px; max-height: 300px; overflow: auto; border: 1px solid var(--line); border-radius: 6px }
 .lresults button { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; text-align: left; border: 0; border-bottom: 1px solid var(--soft); background: var(--surface); padding: 8px 10px; cursor: pointer; font-size: 13px }
@@ -454,12 +461,35 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
 
   <!-- LAUDOS -->
   <section class="view" id="v-laudos" hidden>
-    <div class="laudos">
-      <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
-        <div class="panel">
-          <div class="hd"><span class="label">Aguardando faturamento</span><span class="src" id="lPendCount"></span></div>
-          <div class="bd" style="padding-top:8px"><div class="lresults" id="lPend" style="margin-top:0"></div></div>
+    <div class="lnav" role="tablist" aria-label="Laudos">
+      <button type="button" data-lv="emitir">Emitir laudo</button>
+      <button type="button" data-lv="fila">Fila do faturamento <span class="cnt" id="lvFilaN"></span></button>
+      <button type="button" data-lv="emitidos">Laudos emitidos <span class="cnt" id="lvEmitN"></span></button>
+    </div>
+    <div id="lvFila" hidden>
+      <div class="panel">
+        <div class="hd"><span class="label">Aguardando faturamento</span><span class="src" id="lPendCount"></span></div>
+        <div class="bd" style="padding-top:8px"><p class="src" style="margin:0 0 8px">Laudos preparados pelo laboratório. Clique em um para preencher a nota fiscal e a data de entrega e emitir o PDF.</p><div class="lresults" id="lPend" style="margin-top:0;max-height:none"></div></div>
+      </div>
+    </div>
+    <div id="lvEmitidos" hidden>
+      <div class="panel" style="margin-bottom:14px"><div class="bd">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end">
+          <div class="field" style="grid-column:span 2"><label for="leBusca">Buscar (lote, NF, produto ou cliente)</label><input type="search" id="leBusca" placeholder="Ex.: 103524, NF 4521, ETERNIT"></div>
+          <div class="field"><label for="leProd">Produto</label><input type="text" id="leProd" list="dlLeProd" autocomplete="off" placeholder="Todos"><datalist id="dlLeProd"></datalist></div>
+          <div class="field"><label for="leCli">Cliente</label><select id="leCli"><option value="">Todos</option></select></div>
+          <div class="field"><label for="leDe">Emitido de</label><input type="date" id="leDe"></div>
+          <div class="field"><label for="leAte">até</label><input type="date" id="leAte"></div>
+          <div class="field"><label for="leSt">Situação</label><select id="leSt"><option value="emitido">Emitidos</option><option value="aguardando">Aguardando faturamento</option><option value="">Todos</option></select></div>
+          <div class="row" style="gap:8px;flex-wrap:nowrap;grid-column:span 2"><button type="button" class="btn small" id="leLimpar">Limpar filtros</button><button type="button" class="btn small" id="leXls">Exportar Excel</button></div>
         </div>
+      </div></div>
+      <div id="leKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px"></div>
+      <div class="tablebox"><table class="grid" style="min-width:980px"><thead><tr><th>Emissão</th><th>Produto</th><th>Lote</th><th>Cliente</th><th>NF</th><th style="text-align:right">Quantidade</th><th>Entrega</th><th>Situação</th><th></th></tr></thead><tbody id="leBody"></tbody></table></div>
+      <div class="foot"><span id="leCount"></span><span>Clique em uma linha para abrir o laudo.</span></div>
+    </div>
+    <div class="laudos" id="lvEmitir">
+      <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
         <div class="panel" data-lab>
           <div class="hd"><span class="label">Novo laudo · escolha o lote liberado</span><span class="src" id="lResCount"></span></div>
           <div class="bd">
@@ -484,14 +514,14 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
               <table class="lens"><thead><tr><th></th><th>Ensaio</th><th>Padrão</th><th>Resultado</th></tr></thead><tbody id="lEnsBody"></tbody></table>
               <p class="src" data-lab>Os ensaios vêm do registro de liberação. Desmarque os que não devem sair no laudo.</p>
             </div>
-            <div data-lab>
-              <span class="label">Rodapé e responsável técnico</span>
-              <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+            <details data-lab class="lcfg">
+              <summary><span class="label">Rodapé e responsável técnico</span> <span class="src" id="lCfgResumo"></span></summary>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
                 <input type="text" id="lLinha1" aria-label="Linha 1 do rodapé">
                 <input type="text" id="lLinha2" aria-label="Linha 2 do rodapé">
                 <div class="row"><button type="button" class="btn small" id="lSalvarResp">Salvar como padrão</button><span class="src" id="lRespMsg"></span></div>
               </div>
-            </div>
+            </details>
             <label class="row" id="lConfRow" hidden style="font-size:13px"><input type="checkbox" id="lConf"> <span>Confirmo a emissão mesmo com parâmetro fora da especificação.</span></label>
             <div class="err" id="lErr" hidden></div>
             <div class="row" style="justify-content:flex-end">
@@ -499,10 +529,6 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
               <button type="button" class="btn primary" id="lGerar" disabled>Emitir laudo em PDF</button>
             </div>
           </div>
-        </div>
-        <div class="panel">
-          <div class="hd"><span class="label">Laudos emitidos</span><span class="src">Clique para abrir de novo</span></div>
-          <div class="bd" style="padding-top:6px;overflow-x:auto"><table class="mini" style="min-width:560px"><tbody id="lHist"><tr><td class="empty">Nenhum laudo emitido ainda.</td></tr></tbody></table></div>
         </div>
       </div>
       <div class="sheetwrap">
@@ -897,7 +923,7 @@ function showTab(t) {
   TABS.forEach(x => { $('v-' + x).hidden = x !== t; const a = document.querySelector(`[data-tab="${x}"]`); a.setAttribute('aria-current', x === t ? 'page' : 'false'); a.href = hashFor(x); });
   if (t === 'registros') { ensureAll(); renderRegistros(); }
   if (t === 'especificacoes') { if (S.perfil !== 'faturamento') ensureAll(); renderSpecs(); }
-  if (t === 'laudos') { ensureAll(MODS.pa); renderLaudoList(); renderLaudo(); }
+  if (t === 'laudos') { ensureAll(MODS.pa); if (!LZ.view) setLaudoView(isFat() ? 'fila' : 'emitir'); renderLaudoList(); renderLaudo(); }
   if (t === 'validades') { ensureAll(MODS.mp); renderValidades(); }
   if (t === 'esp') renderEsp();
   if (t === 'rnc') { ['pa', 'pi', 'mp'].forEach(k => { startModule(k); if (S.perfil !== 'qualidade') ensureAll(MODS[k]); }); startRnc(); renderRnc(); }
@@ -2967,24 +2993,69 @@ $('lSalvarResp').addEventListener('click', async () => {
 function renderPend() {
   const pend = LZ.all.filter(h => h.status === 'aguardando');
   $('lPendCount').textContent = pend.length ? `${pend.length} na fila` : '';
+  $('lvFilaN').textContent = pend.length || '';
   $('lPend').innerHTML = pend.map(h => `<button type="button" class="pend-row" data-lid="${esc(h.id)}" aria-pressed="${LZ.cur?.id === h.id}"><span class="mono">${esc(h.lote)}</span><span>${esc(h.produto)}</span><span class="src">${dt(h.preparadoEm)}</span><span class="sub">${esc(h.cliente || 'Cliente a definir')}${h.qtd ? ' · ' + esc(qtdTxt(h.qtd)) : ''}</span></button>`).join('')
     || `<div class="empty">Nenhum laudo aguardando faturamento.</div>`;
-  const emit = LZ.all.filter(h => h.status === 'emitido' || !h.status);
-  $('lHist').innerHTML = emit.length ? emit.map(h => `<tr data-lid="${esc(h.id)}" style="cursor:pointer"><td class="mono">${dt(h.emitidoEm)}</td><td>${esc(h.produto)}</td><td class="mono">${esc(h.lote)}</td><td>${esc(h.cliente || '—')}</td><td class="src">NF ${esc(h.nf || '—')}</td><td><button type="button" class="btn small" data-dl="${esc(h.id)}">Baixar PDF</button></td></tr>`).join('')
-    : '<tr><td class="empty">Nenhum laudo emitido ainda.</td></tr>';
-  $('dlClientes').innerHTML = [...new Set(LZ.all.map(h => h.cliente).filter(Boolean))].sort().map(c => `<option value="${esc(c)}">`).join('');
+  const clientes = [...new Set(LZ.all.map(h => h.cliente).filter(Boolean))].sort();
+  $('dlClientes').innerHTML = clientes.map(c => `<option value="${esc(c)}">`).join('');
+  const cs = $('leCli').value; $('leCli').innerHTML = '<option value="">Todos</option>' + clientes.map(c => `<option${c === cs ? ' selected' : ''}>${esc(c)}</option>`).join('');
+  $('dlLeProd').innerHTML = [...new Set(LZ.all.map(h => h.produto).filter(Boolean))].sort().map(c => `<option value="${esc(c)}">`).join('');
+  $('lvEmitN').textContent = LZ.all.filter(h => h.status === 'emitido' || !h.status).length || '';
+  $('lCfgResumo').textContent = $('lLinha2').value ? '· ' + $('lLinha2').value.slice(0, 60) : '';
+  renderEmitidos();
 }
-$('lPend').addEventListener('click', (e) => { const b = e.target.closest('[data-lid]'); if (!b) return; const h = LZ.all.find(x => x.id === b.dataset.lid); if (h) openLaudoDoc(h); });
-$('lHist').addEventListener('click', async (e) => {
+function laudosFiltrados() {
+  const q = $('leBusca').value.trim().toUpperCase(), pr = normNome($('leProd').value), cli = $('leCli').value, de = $('leDe').value, ate = $('leAte').value, stt = $('leSt').value;
+  return LZ.all.filter(h => {
+    const st0 = h.status || 'emitido'; if (stt && st0 !== stt) return false;
+    const d = (st0 === 'emitido' ? h.emitidoEm : h.preparadoEm || h.atualizadoEm || '').slice(0, 10);
+    if (de && d < de) return false; if (ate && d > ate) return false;
+    if (pr && !normNome(h.produto).includes(pr)) return false;
+    if (cli && h.cliente !== cli) return false;
+    if (q && !`${h.lote} ${h.nf || ''} ${h.produto} ${h.cliente || ''}`.toUpperCase().includes(q)) return false;
+    return true;
+  }).map(h => ({ ...h, _d: ((h.status || 'emitido') === 'emitido' ? h.emitidoEm : h.preparadoEm || h.atualizadoEm || '') || '' })).sort((a, b) => b._d.localeCompare(a._d));
+}
+function renderEmitidos() {
+  if ($('lvEmitidos').hidden) return;
+  const list = laudosFiltrados();
+  const kg = list.reduce((s, h) => s + (parseNum(h.qtd) || 0), 0);
+  const kpi = (v, l) => `<div class="panel" style="padding:12px 16px"><div style="font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1.1">${v}</div><div class="label" style="margin-top:4px">${l}</div></div>`;
+  $('leKpis').innerHTML = kpi(list.length, 'Laudos') + kpi(kg ? kg.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + ' kg' : '—', 'Quantidade total') + kpi(new Set(list.map(h => h.cliente).filter(Boolean)).size, 'Clientes') + kpi(new Set(list.map(h => normNome(h.produto))).size, 'Produtos');
+  $('leBody').innerHTML = list.slice(0, 500).map(h => { const em = (h.status || 'emitido') === 'emitido';
+    return `<tr data-lid="${esc(h.id)}"><td class="num">${dt(h._d)}</td><td>${esc(h.produto)}</td><td class="mono">${esc(h.lote)}</td><td>${esc(h.cliente || '—')}</td><td class="mono">${esc(h.nf || '—')}</td><td class="num" style="text-align:right">${h.qtd ? esc(qtdTxt(h.qtd)) : '—'}</td><td class="num">${dataBR(h.dataEntrega)}</td><td>${em ? '<span class="chip ok">Emitido</span>' : '<span class="chip pend">Aguardando</span>'}</td><td>${em ? `<button type="button" class="btn small" data-dl="${esc(h.id)}">PDF</button>` : ''}</td></tr>`; }).join('')
+    || `<tr><td colspan="9" class="empty">${LZ.all.length ? 'Nenhum laudo com esses filtros.' : 'Nenhum laudo emitido ainda.'}</td></tr>`;
+  $('leCount').textContent = `${list.length} laudo(s)${list.length > 500 ? ' · mostrando os 500 mais recentes' : ''}`;
+}
+['leBusca', 'leProd', 'leDe', 'leAte'].forEach(id => $(id).addEventListener('input', renderEmitidos));
+['leCli', 'leSt'].forEach(id => $(id).addEventListener('change', renderEmitidos));
+$('leLimpar').addEventListener('click', () => { ['leBusca', 'leProd', 'leDe', 'leAte', 'leCli'].forEach(id => $(id).value = ''); $('leSt').value = 'emitido'; renderEmitidos(); });
+$('leXls').addEventListener('click', async () => {
+  const list = laudosFiltrados(); if (!list.length) { toast('Nenhum laudo para exportar.'); return; }
+  let X; try { X = await loadXlsx(); } catch { toast('Não foi possível carregar o gerador de Excel. Verifique a internet.'); return; }
+  const rows = list.map(h => ({ 'Emissão': h._d ? new Date(h._d).toLocaleDateString('pt-BR') : '', 'Produto': h.produto, 'Lote': h.lote, 'Cliente': h.cliente || '', 'NF': h.nf || '', 'Quantidade (kg)': parseNum(h.qtd) ?? (h.qtd || ''), 'Data de entrega': dataBR(h.dataEntrega).replace('—', ''), 'Data de produção': dataBR(h.dataProducao).replace('—', ''), 'Situação': (h.status || 'emitido') === 'emitido' ? 'Emitido' : 'Aguardando faturamento' }));
+  const ws = X.utils.json_to_sheet(rows); ws['!cols'] = [12, 36, 12, 30, 12, 14, 14, 14, 22].map(w => ({ wch: w }));
+  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Laudos');
+  try { await S.downloads.save({ filename: `Laudos_emitidos_${hoje()}.xlsx`, data: new Blob([X.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) }); } catch { toast('Não foi possível baixar o Excel.'); }
+});
+function setLaudoView(v) {
+  LZ.view = v;
+  document.querySelectorAll('[data-lv]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.lv === v)));
+  $('lvEmitir').hidden = v !== 'emitir'; $('lvFila').hidden = v !== 'fila'; $('lvEmitidos').hidden = v !== 'emitidos';
+  if (v === 'emitidos') renderEmitidos();
+}
+document.querySelector('.lnav').addEventListener('click', (e) => { const b = e.target.closest('[data-lv]'); if (b) setLaudoView(b.dataset.lv); });
+$('lPend').addEventListener('click', (e) => { const b = e.target.closest('[data-lid]'); if (!b) return; const h = LZ.all.find(x => x.id === b.dataset.lid); if (h) { openLaudoDoc(h); setLaudoView('emitir'); } });
+$('leBody').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-dl]');
   if (b) { const h = LZ.all.find(x => x.id === b.dataset.dl); try { await savePdf(h); } catch (x) { toast(x?.msg || 'Não foi possível baixar o PDF.'); } return; }
   const tr = e.target.closest('tr[data-lid]'); if (!tr) return;
-  const h = LZ.all.find(x => x.id === tr.dataset.lid); if (h) openLaudoDoc(h);
+  const h = LZ.all.find(x => x.id === tr.dataset.lid); if (h) { openLaudoDoc(h); setLaudoView('emitir'); }
 });
 function startLaudos() {
   if (LZ.started || !S.db) return; LZ.started = true;
   S.db.doc('config/laudo').get().then(s => { if (s.exists) { LZ.cfg = { ...LDEF, ...s.data() }; if (!LZ.rec) { $('lLinha1').value = LZ.cfg.linha1; $('lLinha2').value = LZ.cfg.linha2; renderLaudo(); } } }).catch(() => {});
-  S.db.collection('laudos').orderBy('atualizadoEm', 'desc').limit(300).onSnapshot((snap) => {
+  S.db.collection('laudos').orderBy('atualizadoEm', 'desc').limit(5000).onSnapshot((snap) => {
     LZ.all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     if (LZ.cur?.id) { const n = LZ.all.find(x => x.id === LZ.cur.id); if (n) LZ.cur = n; }
     renderPend(); renderLaudo();
