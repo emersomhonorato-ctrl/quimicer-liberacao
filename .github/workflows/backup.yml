@@ -138,3 +138,22 @@ jobs:
           unzip -l "out/fontes_$D.zip" | grep ' index.html$' >/dev/null || { echo "::error::index.html ausente nos fontes"; exit 1; }
           ls -la "out/fontes_$D.zip"; cat out/fontes_versao.txt
           echo "FONTES_OK ($N arquivos)"
+
+      - name: Etapa 7 - Planilhas Excel FR 001, FR 002 e FR 011
+        env:
+          PGPASSWORD: ${{ secrets.BACKUP_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          P=$(printf '%s\n' "$PGPASSWORD" | tr -d '\r' | grep -E '^[A-Za-z0-9]{32}$' | head -1 || true)
+          [ -n "$P" ] && export PGPASSWORD="$P"
+          pip install --quiet openpyxl
+          mkdir -p json out/excel
+          Q() { /usr/lib/postgresql/17/bin/psql "$PGCONN" -Atc "select coalesce(json_agg(t),'[]') from ($1) t" > "json/$2"; }
+          Q "select modulo,id,dados from public.itens" itens.json
+          Q "select id,modulo,mes,origem,ordem,dados from public.registros" registros.json
+          Q "select id,dados from public.lotes_mp" lotes.json
+          Q "select chave,dados from public.config" config.json
+          python3 src/.github/scripts/gerar_excel.py json out/excel
+          ls -la out/excel
+          [ "$(ls out/excel/*.xlsx | wc -l)" = "3" ] || { echo "::error::Faltou alguma planilha"; exit 1; }
+          echo "EXCEL_OK"
