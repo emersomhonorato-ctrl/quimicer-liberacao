@@ -36,7 +36,9 @@ jobs:
           D=$(TZ=America/Sao_Paulo date +%Y-%m-%d)
           mkdir -p out
           HOST=""
-          echo "Tamanho da senha recebida: ${#PGPASSWORD} caracteres"
+          P=$(printf '%s\n' "$PGPASSWORD" | tr -d '\r' | grep -E '^[A-Za-z0-9]{32}$' | head -1 || true)
+          [ -n "$P" ] && export PGPASSWORD="$P"
+          echo "Tamanho da senha usada: ${#PGPASSWORD} caracteres"
           for H in aws-1-sa-east-1.pooler.supabase.com aws-0-sa-east-1.pooler.supabase.com; do
             if OUT=$($BIN/psql "host=$H port=5432 dbname=postgres user=backup_ro.$PROJ sslmode=require connect_timeout=15" -Atc "select 1" 2>&1); then HOST=$H; break; else echo "$H -> $(echo "$OUT" | tail -1)"; fi
           done
