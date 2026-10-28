@@ -132,6 +132,7 @@ jobs:
           D=$(TZ=America/Sao_Paulo date +%Y-%m-%d)
           cd src
           git archive --format=zip -9 -o "../out/fontes_$D.zip" HEAD
+          cp .github/scripts/ROTEIRO_RESTAURACAO.md ../out/ 2>/dev/null || true
           echo "Commit: $(git log -1 --format='%h %ci %s')" > ../out/fontes_versao.txt
           cd ..
           N=$(unzip -l "out/fontes_$D.zip" | tail -1 | awk '{print $2}')
@@ -178,6 +179,26 @@ jobs:
           echo "Copias guardadas no Drive:"; rclone lsl "$DEST" --include "backup_quimicer_*.zip"
           echo "$Z ($(du -h "$Z" | cut -f1))" > zipinfo.txt
           echo "DRIVE_OK"
+
+      - name: Teste de restauracao (domingos e execucoes manuais)
+        run: |
+          set -euo pipefail
+          DOW=$(TZ=America/Sao_Paulo date +%u)
+          if [ "$DOW" != "7" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then echo "Hoje nao e domingo - teste de restauracao pulado"; exit 0; fi
+          BIN=/usr/lib/postgresql/17/bin
+          docker run -d --name pgteste -e POSTGRES_PASSWORD=teste -p 5433:5432 postgres:17 >/dev/null
+          export PGPASSWORD=teste
+          T="host=localhost port=5433 user=postgres dbname=postgres"
+          for i in $(seq 1 40); do $BIN/psql "$T" -Atc 'select 1' >/dev/null 2>&1 && break; sleep 2; done
+          $BIN/psql "$T" -q -c "create role anon; create role authenticated; create role service_role; create schema auth; create schema extensions; create function auth.uid() returns uuid language sql as 'select null::uuid'; create function auth.role() returns text language sql as 'select null::text'; create function auth.jwt() returns jsonb language sql as 'select null::jsonb';"
+          zcat out/banco_sistema.sql.gz | $BIN/psql "$T" -q > restore.log 2>&1 || true
+          ERR=$(grep -c ERROR restore.log || true)
+          echo "Avisos na restauracao: $ERR (esperados: recursos exclusivos do Supabase, como cron e permissoes)"
+          $BIN/psql "$T" -AtF';' -c "select 'registros',count(*) from public.registros union all select 'laudos',count(*) from public.laudos union all select 'itens',count(*) from public.itens union all select 'rnc',count(*) from public.rnc" > restaurado.txt
+          echo "--- Banco original ---"; cat out/conferencia.txt
+          echo "--- Banco restaurado ---"; cat restaurado.txt
+          if diff -q out/conferencia.txt restaurado.txt >/dev/null; then echo "RESTAURACAO_OK"; else echo "::error::Restauracao com contagem diferente"; grep ERROR restore.log | head -20; exit 1; fi
+          docker rm -f pgteste >/dev/null
 
       - name: Etapa 9 - E-mail diario com as planilhas
         env:
