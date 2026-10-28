@@ -619,9 +619,9 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
     <div class="row" style="justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn" id="a2Off">Desativar alerta</button><button type="button" class="btn" id="a2Nao">Não inativar</button><button type="submit" class="btn danger" id="a2Sim">Sim, inativar</button></div>
   </div></form></dialog>
 <dialog id="dExcl"><form id="exForm" novalidate>
-  <div class="hd"><div><div class="label">Excluir item da especificação</div><h2 style="font-size:22px" id="exNome"></h2></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
+  <div class="hd"><div><div class="label" id="exLabel">Excluir item da especificação</div><h2 style="font-size:22px" id="exNome"></h2></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
   <div class="bd" style="display:flex;flex-direction:column;gap:12px">
-    <div class="lwarn nc">A exclusão apaga o item do cadastro e não pode ser desfeita. As liberações antigas continuam nos registros. <span id="exInfo"></span></div>
+    <div class="lwarn nc" id="exWarn">A exclusão apaga o item do cadastro e não pode ser desfeita. As liberações antigas continuam nos registros. <span id="exInfo"></span></div>
     <div class="field"><label for="exMotivo">Motivo da revisão da ESP</label><textarea id="exMotivo" placeholder="Ex.: produto descontinuado; cadastro duplicado"></textarea></div>
     <div class="err" id="exErr" hidden></div>
     <div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn danger" id="exGo">Excluir definitivamente</button></div>
@@ -1488,7 +1488,7 @@ function renderSpecs() {
     : list.length ? list.map(p => `<tr data-id="${esc(p.id)}"><td>${esc(p.nome)}${p.codigo ? ` <span class="src">cód. ${esc(p.codigo)}</span>` : ''}</td>`
       + faixas.map(x => `<td class="v">${rg(p[x.mn], p[x.mx])}${x.copo && p[x.copo] ? ` <span class="src">${esc(p[x.copo])}${x.k === 'visc' && isBrook(p) ? ' (cP)' : ''}</span>` : ''}</td>`).join('')
       + M.specText.map(t => `<td>${esc(p[t.k] || '—')}</td>`).join('')
-      + `<td class="xspec">${(p.extras || []).map(e => `<div>${esc(e.nome)}: ${extraRange(e)}</div>`).join('') || '—'}</td>${M.laudo ? `<td>${laudosDe(p.nome).length ? `<button type="button" class="btn small" data-laudosmp="${esc(p.nome)}">${laudosDe(p.nome).length} PDFs</button>` : '<span class="src">—</span>'}</td>` : ''}${M.docs ? `<td>${docsCell(p)}</td>` : ''}<td><div class="row" style="gap:6px;flex-wrap:nowrap">${p.ativo === false ? '<span class="chip na">Inativo</span>' : '<span class="chip ok">Ativo</span>'}${al2.has(p.id) ? `<button type="button" class="chip pend" data-al2="${M.key}|${esc(p.id)}" title="Sem liberação há mais de 2 anos" style="cursor:pointer;border:0;white-space:nowrap">2 anos sem liberar</button>` : ''}${podeExcluir() ? '<button type="button" class="btn small danger" data-delspec title="Excluir item">Excluir</button>' : ''}</div></td></tr>`).join('')
+      + `<td class="xspec">${(p.extras || []).map(e => `<div>${esc(e.nome)}: ${extraRange(e)}</div>`).join('') || '—'}</td>${M.laudo ? `<td>${laudosDe(p.nome).length ? `<button type="button" class="btn small" data-laudosmp="${esc(p.nome)}">${laudosDe(p.nome).length} PDFs</button>` : '<span class="src">—</span>'}</td>` : ''}${M.docs ? `<td>${docsCell(p)}</td>` : ''}<td><div class="row" style="gap:6px;flex-wrap:nowrap">${p.ativo === false ? '<span class="chip na">Inativo</span>' : '<span class="chip ok">Ativo</span>'}${al2.has(p.id) ? `<button type="button" class="chip pend" data-al2="${M.key}|${esc(p.id)}" title="Sem liberação há mais de 2 anos" style="cursor:pointer;border:0;white-space:nowrap">2 anos sem liberar</button>` : ''}${podeEsp() && p.ativo !== false ? '<button type="button" class="btn small" data-inatspec title="Inativar item (sai da ESP e da lista de liberação)">Inativar</button>' : ''}</div></td></tr>`).join('')
     : `<tr><td colspan="${nc}" class="empty">${d.itens.size ? 'Nenhum item com esse filtro.' : `Nenhuma especificação cadastrada. Use ${esc(M.novo)} para incluir a primeira.`}</td></tr>`;
   $('pCount').textContent = `${list.length} de ${d.itens.size} ${M.itemPl}`;
   $('pPerm').textContent = podeEsp() ? 'Clique em uma linha para editar.' : podeIncluir() ? `Você pode incluir itens novos${M.docs ? ' e anexar Inf. técnico / FDS (clique na linha)' : ''}${M.laudo ? ' e importar laudos' : ''}. Alterar itens existentes: administrador e laboratório.` : 'Somente administrador e laboratório alteram especificações.';
@@ -1497,7 +1497,7 @@ function renderSpecs() {
 }
 $('pBusca').addEventListener('input', renderSpecs);
 $('pFiltro').addEventListener('change', renderSpecs);
-$('pBody').addEventListener('click', (e) => { if (e.target.closest('[data-laudosmp]')) return; const a2 = e.target.closest('[data-al2]'); if (a2) { abrir2Anos(a2.dataset.al2); return; } const del = e.target.closest('[data-delspec]'); if (del && podeExcluir()) { specEditing = del.closest('tr').dataset.id; abrirExcl(); return; } const tr = e.target.closest('tr[data-id]'); if (tr && (podeEsp() || (M.docs && podeAnexar()))) openSpec(tr.dataset.id); });
+$('pBody').addEventListener('click', (e) => { if (e.target.closest('[data-laudosmp]')) return; const a2 = e.target.closest('[data-al2]'); if (a2) { abrir2Anos(a2.dataset.al2); return; } const ina = e.target.closest('[data-inatspec]'); if (ina && podeEsp()) { specEditing = ina.closest('tr').dataset.id; abrirExcl('inativar'); return; } const tr = e.target.closest('tr[data-id]'); if (tr && (podeEsp() || (M.docs && podeAnexar()))) openSpec(tr.dataset.id); });
 $('pNovo').addEventListener('click', () => openSpec(null));
 
 let specEditing = null;
@@ -1614,14 +1614,38 @@ $('specForm').addEventListener('submit', async (e) => {
   }
   catch (x) { err(x?.code === 'invalid_argument' ? 'Somente administradores podem alterar especificações.' : 'Não foi possível salvar. Tente de novo.'); }
 });
-$('specDel').addEventListener('click', () => abrirExcl());
-function abrirExcl() {
-  const p = st().itens.get(specEditing) || {};
+$('specDel').addEventListener('click', () => abrirExcl('excluir'));
+let exModo = 'excluir';
+function abrirExcl(modo) {
+  const p = st().itens.get(specEditing) || {}; exModo = modo || 'excluir'; const ina = exModo === 'inativar';
+  $('exLabel').textContent = ina ? 'Inativar item da especificação' : 'Excluir item da especificação';
+  $('exWarn').className = ina ? 'lwarn' : 'lwarn nc';
+  $('exWarn').innerHTML = ina ? 'O item fica inativo: sai da ESP impressa, do Excel da ESP e da lista de produtos para liberar. O cadastro e as liberações antigas são mantidos e ele pode ser reativado depois (clique na linha e mude a situação para Ativo). A ESP sobe uma revisão.' : 'A exclusão apaga o item do cadastro e não pode ser desfeita. As liberações antigas continuam nos registros. <span id="exInfo"></span>';
+  $('exGo').textContent = ina ? 'Inativar' : 'Excluir definitivamente'; $('exGo').className = ina ? 'btn primary' : 'btn danger';
+  $('exMotivo').placeholder = ina ? 'Ex.: produto descontinuado; sem liberação há 2 anos' : 'Ex.: produto descontinuado; cadastro duplicado';
+  if (ina) { $('exNome').textContent = p.nome || ''; $('exMotivo').value = ''; $('exErr').hidden = true; $('dExcl').showModal(); $('exMotivo').focus(); return; }
   $('exNome').textContent = p.nome || ''; $('exInfo').textContent = p.ativo === false ? 'O item já está inativo: a revisão da ESP não muda, a exclusão fica só registrada.' : 'O item está ativo: a ESP sobe uma revisão.';
   $('exMotivo').value = ''; $('exErr').hidden = true; $('dExcl').showModal(); $('exMotivo').focus();
 }
 $('exForm').addEventListener('submit', async (e) => {
-  e.preventDefault(); const id = specEditing; if (!id || !podeExcluir()) return;
+  e.preventDefault(); const id = specEditing;
+  if (exModo === 'inativar') {
+    if (!id || !podeEsp()) return;
+    const p0 = st().itens.get(id) || {}, mot = $('exMotivo').value.trim();
+    if (!mot) { $('exErr').textContent = 'Informe o motivo da inativação.'; $('exErr').hidden = false; return; }
+    const doc = { ...p0, ativo: false, atualizadoEm: new Date().toISOString(), atualizadoPor: S.uid || null };
+    Object.keys(doc).forEach(x => { if (x.startsWith('_')) delete doc[x]; });
+    const bi = $('exGo'); bi.disabled = true;
+    try {
+      await S.db.collection(coll('itens')).doc(id).set(doc); st().itens.set(id, doc); $('dExcl').close(); renderSpecs();
+      let rv = null; try { rv = await espLog(M.key, 'exclusao', p0.nome || id, 'Item inativado', null, null, mot); } catch { toast('Item inativado, mas a revisão da ESP não foi registrada.'); return; }
+      toast(`${p0.nome} inativado · ESP passou para a revisão ${rv}`);
+      if (rv != null) gerarListaAss(infoEsp(M, rv));
+    } catch { $('exErr').textContent = 'Não foi possível inativar. Tente de novo.'; $('exErr').hidden = false; }
+    finally { bi.disabled = false; }
+    return;
+  }
+  if (!id || !podeExcluir()) return;
   const p = st().itens.get(id) || {}, motivo = $('exMotivo').value.trim();
   if (!motivo) { $('exErr').textContent = 'Informe o motivo da exclusão.'; $('exErr').hidden = false; return; }
   const b = $('exGo'); b.disabled = true;
@@ -1844,7 +1868,7 @@ async function salvar2Anos(extra, tipoEsp) {
   ['a2Sim', 'a2Nao', 'a2Off'].forEach(b => $(b).disabled = true);
   try {
     await S.db.collection(MODS[k].col.itens).doc(id).set(doc); D[k].itens.set(id, doc);
-    if (tipoEsp) { try { await espLog(k, tipoEsp, doc.nome || id, '', null, null, $('a2Motivo').value.trim()); } catch { toast('Item inativado, mas a revisão da ESP não foi registrada.'); } }
+    if (tipoEsp) { try { const rv = await espLog(k, tipoEsp, doc.nome || id, 'Item inativado', null, null, $('a2Motivo').value.trim()); if (rv != null) gerarListaAss(infoEsp(MODS[k], rv)); } catch { toast('Item inativado, mas a revisão da ESP não foi registrada.'); } }
     $('d2Anos').close(); return true;
   } catch { $('a2Err').textContent = 'Não foi possível salvar. Verifique a conexão.'; $('a2Err').hidden = false; return false; }
   finally { ['a2Sim', 'a2Nao', 'a2Off'].forEach(b => $(b).disabled = false); if (S.tab === 'indicadores') renderIndicadores(); if (S.tab === 'especificacoes') renderSpecs(); }
@@ -2203,10 +2227,10 @@ const DOCT = { it: 'Informativo técnico', fds: 'FDS' };
 const DOCS = { map: new Map(), started: false };
 const docKey = (nome) => 'pa-' + slug(normNome(nome));
 function docsDe(nome, tipo) { const d = DOCS.map.get(docKey(nome)); return ((d && d[tipo]) || []).slice().sort((a, b) => (b.data || b.em || '').localeCompare(a.data || a.em || '')); }
-function docLink(a, txt) { return `<a href="/_blob/${esc(a.id)}" target="_blank" rel="noopener" title="${esc(a.nome)}">${esc(txt || a.nome)}</a>`; }
+function docLink(a, txt, cls) { return `<a href="/_blob/${esc(a.id)}" target="_blank" rel="noopener" title="${esc(a.nome)}"${cls ? ` class="${cls}" style="text-decoration:none"` : ''}>${esc(txt || a.nome)}</a>`; }
 function docsCell(p) {
-  const out = ['it', 'fds'].map(t => { const l = docsDe(p.nome, t); return l.length ? `<span style="white-space:nowrap">${docLink(l[0], t === 'it' ? 'IT' : 'FDS')}${l.length > 1 ? ` <button type="button" class="btn small" data-docs="${esc(p.nome)}" data-tipo="${t}" title="Versões anteriores">+${l.length - 1}</button>` : ''}</span>` : ''; }).filter(Boolean);
-  return out.length ? out.join(' · ') : '<span class="src">—</span>';
+  const out = ['it', 'fds'].map(t => { const l = docsDe(p.nome, t); return l.length ? `<span style="white-space:nowrap;display:inline-flex;gap:4px;align-items:center">${docLink(l[0], t === 'it' ? 'IT' : 'FDS', 'btn small')}${l.length > 1 ? ` <button type="button" class="btn small" data-docs="${esc(p.nome)}" data-tipo="${t}" title="Versões anteriores">+${l.length - 1}</button>` : ''}</span>` : ''; }).filter(Boolean);
+  return out.length ? `<div class="row" style="gap:6px;flex-wrap:nowrap">${out.join('')}</div>` : '<span class="src">—</span>';
 }
 function startDocs() {
   if (DOCS.started || !S.db) return; DOCS.started = true;
