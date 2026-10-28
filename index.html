@@ -293,6 +293,7 @@ dl.kv dd { margin: 0; min-width: 0 }
 html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% } img { max-width: 100% }
 .gate a { color: var(--accent) } .gate a:hover { text-decoration: none }
 </style>
+<script>window.APP_BUILD = '28/10/2026 15:26';</script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 </head>
@@ -316,7 +317,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       <a href="#laudos" data-tab="laudos" id="tabLaudos">Laudos</a>
       <a href="#validades" data-tab="validades" id="tabVal" hidden>Validades</a>
     </nav>
-    <div class="conn" id="conn"><span class="dot" id="connDot"></span><span id="connTxt">Conectando…</span><span class="perfil" id="perfilTag" hidden></span><button type="button" class="btn small" id="btnAcessos" hidden>Usuários</button><button type="button" class="btn small" id="btnAtualizar" title="Recarrega o app com a versão mais nova e os dados atualizados">↻ Atualizar</button><button type="button" class="btn small" id="btnInstalar" hidden>Instalar app</button><button type="button" class="btn small" id="btnSair" hidden>Sair</button></div>
+    <div class="conn" id="conn"><span class="dot" id="connDot"></span><span id="connTxt">Conectando…</span><span class="perfil" id="perfilTag" hidden></span><button type="button" class="btn small" id="btnAcessos" hidden>Usuários</button><button type="button" class="btn small" id="btnAtualizar" title="Recarrega o app com a versão mais nova e os dados atualizados">↻ Atualizar</button><button type="button" class="btn small" id="btnTec" hidden>Técnico</button><button type="button" class="btn small" id="btnInstalar" hidden>Instalar app</button><button type="button" class="btn small" id="btnSair" hidden>Sair</button></div>
   </div>
 </header>
 
@@ -735,7 +736,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
     </div>
     <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">
       <div class="label" style="margin-bottom:4px">Backup</div>
-      <p class="src" style="margin:0 0 8px">O sistema faz um backup automático todo dia às 3h e guarda os últimos 30 dias. Use o botão para baixar uma cópia completa dos dados (registros, especificações, laudos, revisões da ESP, usuários) e guardar no seu computador ou na rede. Os PDFs ficam listados no backup, mas não vão dentro do arquivo.</p>
+      <p class="src" style="margin:0 0 8px">O sistema faz um backup automático para o Google Drive todo dia às 3h e guarda as 5 últimas cópias. Use o botão para baixar uma cópia completa dos dados (registros, especificações, laudos, revisões da ESP, usuários) e guardar no seu computador ou na rede. Os PDFs ficam listados no backup, mas não vão dentro do arquivo.</p>
       <div class="row" style="gap:8px;align-items:center"><button type="button" class="btn small" id="bkBtn">Baixar backup agora</button><span class="src" id="bkMsg"></span></div>
     </div>
     <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">
@@ -744,6 +745,22 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       <div class="row" style="gap:8px;align-items:center"><button type="button" class="btn small" id="impDadosBtn">Escolher arquivo e importar</button><span class="src" id="impDadosMsg"></span></div>
       <input type="file" id="impDadosFile" accept=".json,application/json" class="sr">
     </div>
+  </div></dialog>
+<dialog id="dTec" style="width:min(760px,calc(100vw - 16px))"><div class="hd"><div><div class="label">Desenvolvedor</div><h2 style="font-size:22px">Painel técnico</h2><p class="src" style="margin:4px 0 0" id="tecSessao"></p></div><button class="x" type="button" data-close aria-label="Fechar">×</button></div>
+  <div class="bd" style="display:flex;flex-direction:column;gap:16px">
+    <div class="row" style="gap:16px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="flex:0 0 240px"><label for="tecVer">Ver o app como</label><select id="tecVer"><option value="">Desenvolvedor (normal)</option><option value="admin">Administrador</option><option value="laboratorio">Laboratório</option><option value="qualidade">Qualidade</option><option value="faturamento">Faturamento</option></select></div>
+      <p class="src" style="margin:0;flex:1 1 260px">Muda só as telas e botões, para testar o que cada perfil enxerga. O banco continua com o seu acesso. Para voltar, escolha Desenvolvedor.</p>
+    </div>
+    <div><div class="label" style="margin-bottom:6px">Dados no banco</div><div id="tecDados" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px"></div></div>
+    <div><div class="label" style="margin-bottom:6px">Backup diário (Google Drive)</div><table class="acc"><tbody id="tecBk"></tbody></table></div>
+    <div><div class="label" style="margin-bottom:6px">Atalhos</div><div class="row" style="gap:8px;flex-wrap:wrap">
+      <a class="btn small" style="text-decoration:none;color:var(--ink)" href="https://supabase.com/dashboard/project/bcvlbqqoubeyxxuvkipf" target="_blank" rel="noopener">Supabase</a>
+      <a class="btn small" style="text-decoration:none;color:var(--ink)" href="https://github.com/emersomhonorato-ctrl/quimicer-liberacao" target="_blank" rel="noopener">Código no GitHub</a>
+      <a class="btn small" style="text-decoration:none;color:var(--ink)" href="https://github.com/emersomhonorato-ctrl/quimicer-liberacao/actions/workflows/backup.yml" target="_blank" rel="noopener">Rodar backup agora</a>
+      <button type="button" class="btn small" id="tecCache">Limpar cache e recarregar</button>
+    </div></div>
+    <p class="src" style="margin:0">Versão do app: <span class="mono" id="tecBuild"></span></p>
   </div></dialog>
 
 <dialog id="dDirecao"><form id="dirForm" novalidate>
@@ -3112,7 +3129,7 @@ function startLaudos() {
 renderEns(); renderLaudo();
 
 /* ---------- Supabase: login, perfis e banco de dados ---------- */
-const PERFIS = { administrador: 'Administrador', laboratorio: 'Laboratório', faturamento: 'Faturamento', qualidade: 'Qualidade' };
+const PERFIS = { desenvolvedor: 'Desenvolvedor', administrador: 'Administrador', laboratorio: 'Laboratório', faturamento: 'Faturamento', qualidade: 'Qualidade' };
 const ACC = { user: null, me: null, lista: [] };
 const QC = window.QC_CONFIG || {};
 const RECOVERY = /type=recovery/.test(location.hash);
@@ -3121,8 +3138,10 @@ let SB = null;
 function applyPerfil() {
   const u = ACC.me; const p = S.perfil;
   document.body.classList.toggle('fat', p === 'faturamento');
-  $('perfilTag').hidden = !u; $('perfilTag').textContent = u ? `${u.nome} · ${PERFIS[u.perfil] || ''}` : '';
-  $('btnAcessos').hidden = p !== 'admin'; $('btnSair').hidden = !u;
+  const VC = { admin: 'Administrador', laboratorio: 'Laboratório', qualidade: 'Qualidade', faturamento: 'Faturamento' };
+  $('perfilTag').hidden = !u; $('perfilTag').textContent = u ? `${u.nome} · ${PERFIS[u.perfil] || ''}${S.verComo ? ' · vendo como ' + VC[S.verComo] : ''}` : '';
+  $('perfilTag').classList.toggle('vercomo', !!S.verComo);
+  $('btnAcessos').hidden = p !== 'admin'; $('btnSair').hidden = !u; $('btnTec').hidden = !S.dev;
   const blocked = !u;
   document.querySelectorAll('main > section.view').forEach(sct => { if (blocked) sct.hidden = true; });
   $('gate').hidden = !blocked;
@@ -3136,7 +3155,9 @@ function applyPerfil() {
 }
 async function loadPerfil() {
   ACC.me = { id: S.uid, nome: ACC.perfil.nome || ACC.perfil.email, perfil: ACC.perfil.perfil, email: ACC.perfil.email };
-  S.perfil = ACC.perfil.perfil === 'administrador' ? 'admin' : ACC.perfil.perfil;
+  S.dev = ACC.perfil.perfil === 'desenvolvedor';
+  S.perfilReal = (ACC.perfil.perfil === 'administrador' || S.dev) ? 'admin' : ACC.perfil.perfil;
+  S.perfil = S.dev && S.verComo ? S.verComo : S.perfilReal;
   applyPerfil();
 }
 
@@ -3335,7 +3356,7 @@ function docRef(path) {
   const i = path.lastIndexOf('/'); return collRef(path.slice(0, i)).doc(path.slice(i + 1));
 }
 function makeClaudeShim(p) {
-  const admin = p.perfil === 'administrador', espEdit = admin || p.perfil === 'qualidade';
+  const admin = p.perfil === 'administrador' || p.perfil === 'desenvolvedor', espEdit = admin || p.perfil === 'qualidade';
   const db = { collection: (path) => collRef(path), doc: (path) => docRef(path) };
   const user = { id: async () => S.uid, isOwner: async () => admin, canEdit: async () => admin || p.perfil === 'laboratorio', can: async () => true };
   const downloads = { async save({ filename, data }) { const blob = data instanceof Blob ? data : new Blob([data], { type: /\.pdf$/i.test(filename) ? 'application/pdf' : 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); return true; } };
@@ -3357,10 +3378,14 @@ document.addEventListener('click', async (e) => {
 /* administração de usuários */
 async function loadUsuarios() { ACC.lista = must(await SB.from('perfis').select('*').order('nome')); }
 function renderUsuarios() {
-  $('accBody').innerHTML = ACC.lista.map(u => `<tr data-uid="${esc(u.user_id)}"><td>${esc(u.nome)}${S.uid === u.user_id ? ' <span class="src">(você)</span>' : ''}<div class="src">${esc(u.email || '')}</div></td>
-    <td><select data-k="perfil" aria-label="Perfil"><option value="">Sem acesso</option>${Object.entries(PERFIS).map(([k, v]) => `<option value="${k}"${u.perfil === k ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
-    <td><select data-k="ativo" aria-label="Situação"><option value="1">Ativo</option><option value="0"${u.ativo === false ? ' selected' : ''}>Inativo</option></select></td>
-    <td class="src">${u.criado_em ? new Date(u.criado_em).toLocaleDateString('pt-BR') : ''}</td></tr>`).join('')
+  const lista = ACC.lista;
+  const ops = S.dev ? Object.entries(PERFIS) : Object.entries(PERFIS).filter(([k]) => k !== 'desenvolvedor' && k !== 'administrador');
+  $('accBody').innerHTML = lista.map(u => { const trava = S.uid === u.user_id || (!S.dev && (u.perfil === 'administrador' || u.perfil === 'desenvolvedor')); const dis = trava ? ` disabled title="${S.uid === u.user_id ? 'Você não altera o próprio perfil' : 'Só o desenvolvedor altera administradores'}"` : '';
+    const opts = trava ? [[u.perfil, PERFIS[u.perfil] || 'Sem acesso']] : ops;
+    return `<tr data-uid="${esc(u.user_id)}"><td>${esc(u.nome)}${S.uid === u.user_id ? ' <span class="src">(você)</span>' : ''}<div class="src">${esc(u.email || '')}</div></td>
+    <td><select data-k="perfil" aria-label="Perfil"${dis}>${trava ? '' : '<option value="">Sem acesso</option>'}${opts.map(([k, v]) => `<option value="${k || ''}"${u.perfil === k ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
+    <td><select data-k="ativo" aria-label="Situação"${dis}><option value="1">Ativo</option><option value="0"${u.ativo === false ? ' selected' : ''}>Inativo</option></select></td>
+    <td class="src">${u.criado_em ? new Date(u.criado_em).toLocaleDateString('pt-BR') : ''}</td></tr>`; }).join('')
     || '<tr><td colspan="4" class="empty">Nenhum usuário.</td></tr>';
 }
 $('accBody').addEventListener('change', async (e) => {
@@ -3368,7 +3393,7 @@ $('accBody').addEventListener('change', async (e) => {
   const id = el.closest('tr').dataset.uid; $('accErr').hidden = true;
   const patch = el.dataset.k === 'ativo' ? { ativo: el.value === '1' } : { perfil: el.value || null };
   const { data, error } = await SB.from('perfis').update(patch).eq('user_id', id).select('user_id');
-  if (error || !data?.length) { $('accErr').textContent = /administrador/i.test(error?.message || '') ? 'Mantenha pelo menos um administrador ativo.' : 'Não foi possível salvar a alteração.'; $('accErr').hidden = false; }
+  if (error || !data?.length) { $('accErr').textContent = /Só o desenvolvedor/i.test(error?.message || '') ? error.message : /administrador/i.test(error?.message || '') ? 'Mantenha pelo menos um administrador ativo.' : 'Não foi possível salvar a alteração.'; $('accErr').hidden = false; }
   else toast('Usuário atualizado');
   await loadUsuarios(); renderUsuarios();
 });
@@ -3389,7 +3414,7 @@ $('cvAdd').addEventListener('click', async () => {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return err('Informe um e-mail válido.');
   err('');
   const { error } = await SB.from('convites').upsert({ email, nome, perfil });
-  if (error) return err('Não foi possível salvar o pré-cadastro.');
+  if (error) return err(/Só o desenvolvedor/i.test(error.message || '') ? error.message : 'Não foi possível salvar o pré-cadastro.');
   const u = (ACC.lista || []).find(x => (x.email || '').toLowerCase() === email);
   if (u && !u.perfil) { await SB.from('perfis').update({ perfil, nome: u.nome || nome }).eq('user_id', u.user_id); await loadUsuarios(); renderUsuarios(); }
   $('cvNome').value = ''; $('cvEmail').value = ''; toast('Pré-cadastro salvo'); await loadConvites(); renderConvites();
@@ -3422,7 +3447,43 @@ $('impDadosFile').addEventListener('change', async () => {
   msg(`Importado: ${data.especificacoes} especificações, ${data.historico_planilhas} registros das planilhas, ${data.liberacoes_app} liberações do app, ${data.laudos} laudos, ${data.revisoes_esp} revisões da ESP. Recarregando…`);
   setTimeout(() => location.reload(), 2500);
 });
-$('btnAcessos').addEventListener('click', async () => { $('accErr').hidden = true; try { await loadUsuarios(); } catch {} renderUsuarios(); await loadConvites(); renderConvites(); $('dAcessos').showModal(); });
+$('btnAcessos').addEventListener('click', async () => { $('accErr').hidden = true; try { await loadUsuarios(); } catch {} renderUsuarios(); await loadConvites(); renderConvites();
+  $('cvPerfil').innerHTML = '<option value="laboratorio">Laboratório</option><option value="faturamento">Faturamento</option><option value="qualidade">Qualidade</option>' + (S.dev ? '<option value="administrador">Administrador</option><option value="desenvolvedor">Desenvolvedor</option>' : '');
+  $('dAcessos').showModal(); });
+
+/* ---------- painel técnico (desenvolvedor) ---------- */
+const GH_REPO = 'emersomhonorato-ctrl/quimicer-liberacao';
+async function tecContagens() {
+  const tabs = [['registros', 'Registros de liberação'], ['itens', 'Especificações'], ['laudos', 'Laudos'], ['rnc', 'RNC'], ['esp_revisoes', 'Revisões da ESP'], ['lotes_mp', 'Lotes de MP (validade)'], ['docs_produto', 'Inf. técnico / FDS'], ['perfis', 'Usuários']];
+  $('tecDados').innerHTML = '<span class="src">Contando…</span>';
+  const out = await Promise.all(tabs.map(async ([t, n]) => { try { const { count } = await SB.from(t).select('*', { count: 'exact', head: true }); return [n, count ?? '—']; } catch { return [n, '—']; } }));
+  $('tecDados').innerHTML = out.map(([n, c]) => `<div class="panel" style="padding:10px 12px"><div style="font-family:var(--f-display);font-weight:700;font-size:20px">${typeof c === 'number' ? c.toLocaleString('pt-BR') : c}</div><div class="src">${esc(n)}</div></div>`).join('');
+}
+async function tecBackup() {
+  $('tecBk').innerHTML = '<span class="src">Consultando o GitHub…</span>';
+  try {
+    const r = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/backup.yml/runs?per_page=6`); if (!r.ok) throw 0;
+    const j = await r.json();
+    $('tecBk').innerHTML = (j.workflow_runs || []).map(x => { const ok = x.conclusion === 'success', run = x.status !== 'completed';
+      return `<tr><td class="num">${new Date(x.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td><td>${run ? '<span class="chip pend">Rodando</span>' : ok ? '<span class="chip ok">Concluído</span>' : `<span class="chip nc">${esc(x.conclusion || 'falhou')}</span>`}</td><td class="src">${x.event === 'schedule' ? 'automático' : 'manual'}</td><td><a href="${esc(x.html_url)}" target="_blank" rel="noopener">detalhes</a></td></tr>`; }).join('') || '<tr><td class="src">Nenhuma execução encontrada.</td></tr>';
+  } catch { $('tecBk').innerHTML = `<tr><td class="src">Não foi possível consultar. <a href="https://github.com/${GH_REPO}/actions" target="_blank" rel="noopener">Abrir no GitHub</a></td></tr>`; }
+}
+$('btnTec').addEventListener('click', () => {
+  if (!S.dev) return;
+  $('tecVer').value = S.verComo || ''; $('tecBuild').textContent = window.APP_BUILD || '—';
+  $('tecSessao').textContent = `${ACC.me?.email || ''} · perfil no banco: ${ACC.perfil?.perfil || ''}`;
+  $('dTec').showModal(); tecContagens(); tecBackup();
+});
+$('tecVer').addEventListener('change', () => {
+  if (S.canEditReal === undefined) S.canEditReal = S.canEdit;
+  S.verComo = $('tecVer').value || null; S.canEdit = S.verComo ? (S.verComo === 'laboratorio' || S.verComo === 'admin') : S.canEditReal; loadPerfil();
+  toast(S.verComo ? 'Visualizando o app como ' + $('tecVer').selectedOptions[0].textContent + ' (só a tela muda; o banco continua com seu acesso)' : 'De volta ao perfil Desenvolvedor');
+});
+$('tecCache').addEventListener('click', async () => {
+  try { const regs = await navigator.serviceWorker?.getRegistrations?.() || []; await Promise.all(regs.map(r => r.unregister())); } catch {}
+  try { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } catch {}
+  location.reload();
+});
 
 async function boot() {
   setModule(M.key, false); route();
