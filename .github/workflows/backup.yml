@@ -119,3 +119,22 @@ jobs:
           if [ -d dl ]; then rclone copy dl "$DEST" --transfers 8 --stats-one-line --stats 30s; fi
           echo "Conferencia no Drive: $(rclone lsf -R --files-only "$DEST" | wc -l) arquivos"
           echo "PDFS_OK"
+
+      - name: Baixar os fontes do sistema
+        uses: actions/checkout@v4
+        with:
+          path: src
+          fetch-depth: 1
+
+      - name: Etapa 6 - Fontes do sistema (zip)
+        run: |
+          set -euo pipefail
+          D=$(TZ=America/Sao_Paulo date +%Y-%m-%d)
+          cd src
+          git archive --format=zip -9 -o "../out/fontes_$D.zip" HEAD
+          echo "Commit: $(git log -1 --format='%h %ci %s')" > ../out/fontes_versao.txt
+          cd ..
+          N=$(unzip -l "out/fontes_$D.zip" | tail -1 | awk '{print $2}')
+          unzip -l "out/fontes_$D.zip" | grep ' index.html$' >/dev/null || { echo "::error::index.html ausente nos fontes"; exit 1; }
+          ls -la "out/fontes_$D.zip"; cat out/fontes_versao.txt
+          echo "FONTES_OK ($N arquivos)"
