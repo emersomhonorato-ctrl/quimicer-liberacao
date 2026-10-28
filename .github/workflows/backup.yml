@@ -1,0 +1,62 @@
+name: Backup diario Quimicer
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # todo dia as 03:00 (horario de Brasilia)
+  workflow_dispatch: {}    # permite rodar manualmente
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PROJ: bcvlbqqoubeyxxuvkipf
+    steps:
+      - name: Instalar cliente PostgreSQL 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17 >/dev/null
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+      - name: Etapa 4 - Copia do banco (pg_dump)
+        env:
+          PGPASSWORD: ${{ secrets.BACKUP_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          BIN=/usr/lib/postgresql/17/bin
+          D=$(TZ=America/Sao_Paulo date +%Y-%m-%d)
+          mkdir -p out
+          HOST=""
+          for H in aws-1-sa-east-1.pooler.supabase.com aws-0-sa-east-1.pooler.supabase.com; do
+            if $BIN/psql "host=$H port=5432 dbname=postgres user=backup_ro.$PROJ sslmode=require connect_timeout=15" -Atc "select 1" >/dev/null 2>&1; then HOST=$H; break; fi
+          done
+          [ -n "$HOST" ] || { echo "::error::Nao conectou no banco"; exit 1; }
+          echo "Conectado via $HOST"
+          echo "PGCONN=host=$HOST port=5432 dbname=postgres user=backup_ro.$PROJ sslmode=require" >> $GITHUB_ENV
+          CONN="host=$HOST port=5432 dbname=postgres user=backup_ro.$PROJ sslmode=require"
+          # 1) Estrutura + dados do sistema (schemas public e backup, sem as copias internas antigas)
+          $BIN/pg_dump "$CONN" --no-owner --no-privileges -n public -n backup \
+            --exclude-table-data=backup.copias -f out/banco_sistema.sql
+          # 2) Dados de usuarios (login) e indice dos arquivos anexados
+          $BIN/pg_dump "$CONN" --data-only --no-owner --no-privileges \
+            -t auth.users -t auth.identities -t storage.buckets -t storage.objects -f out/banco_usuarios_arquivos.sql
+          # 3) Conferencia: contagem de linhas por tabela
+          $BIN/psql "$CONN" -Atc "select relname||';'||n_live_tup from pg_stat_user_tables where schemaname='public' order by 1" > out/contagem.txt || true
+          $BIN/psql "$CONN" -AtF';' -c "select 'registros',count(*) from public.registros union all select 'laudos',count(*) from public.laudos union all select 'itens',count(*) from public.itens union all select 'rnc',count(*) from public.rnc" > out/conferencia.txt
+          gzip -9 out/*.sql
+          ls -la out
+          echo "--- Conferencia (linhas) ---"; cat out/conferencia.txt
+          # teste de integridade: o arquivo precisa ter as tabelas principais
+          for T in registros laudos itens perfis rnc; do
+            zgrep -q "CREATE TABLE public.$T " out/banco_sistema.sql.gz || { echo "::error::Tabela $T ausente no dump"; exit 1; }
+          done
+          echo "DUMP_OK $D"
