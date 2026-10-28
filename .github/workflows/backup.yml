@@ -19,6 +19,12 @@ jobs:
     env:
       PROJ: bcvlbqqoubeyxxuvkipf
     steps:
+      - name: Baixar os fontes do sistema
+        uses: actions/checkout@v4
+        with:
+          path: src
+          fetch-depth: 1
+
       - name: Instalar cliente PostgreSQL 17
         run: |
           sudo install -d /usr/share/postgresql-common/pgdg
@@ -120,12 +126,6 @@ jobs:
           echo "Conferencia no Drive: $(rclone lsf -R --files-only "$DEST" | wc -l) arquivos"
           echo "PDFS_OK"
 
-      - name: Baixar os fontes do sistema
-        uses: actions/checkout@v4
-        with:
-          path: src
-          fetch-depth: 1
-
       - name: Etapa 6 - Fontes do sistema (zip)
         run: |
           set -euo pipefail
@@ -176,4 +176,17 @@ jobs:
           fi
           rclone purge "gdrive:Backup Quimicer/teste" >/dev/null 2>&1 || true
           echo "Copias guardadas no Drive:"; rclone lsl "$DEST" --include "backup_quimicer_*.zip"
+          echo "$Z ($(du -h "$Z" | cut -f1))" > zipinfo.txt
           echo "DRIVE_OK"
+
+      - name: Etapa 9 - E-mail diario com as planilhas
+        env:
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python3 src/.github/scripts/enviar_email.py ok
+
+      - name: Aviso de falha por e-mail
+        if: failure()
+        env:
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          if [ -f src/.github/scripts/enviar_email.py ]; then python3 src/.github/scripts/enviar_email.py falha; fi
