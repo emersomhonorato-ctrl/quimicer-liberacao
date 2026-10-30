@@ -170,7 +170,7 @@ def layout(mod):
             ('Analisado por:', 13.14, dict(wrap=True, sz=11, v=ana)), ('Observação', 36.57, dict(v=obs_mp)),
             ('Laudos PDF', 21.14, dict(v=lambda r, c: (r.get('laudo') or {}).get('nome') if isinstance(r.get('laudo'), dict) else (r.get('laudoRef') or '')))])
     if k == 'pi':
-        return dict(titulo=f"Liberação de Produto Intermediário - {mod['fr']} – Rev{mod['_rev']}", tl=2, hdr=4, halt=50.1, zoom=80, escala=70, unico='D',
+        return dict(titulo=f"Liberação de Produto Intermediário - {mod['fr']} – Rev{mod['_rev']}", tl=2, hdr=4, halt=50.1, zoom=80, escala=70, unico='D', ocultas='FGHIKLMNO',
             alturas={1: 9.95, 2: 24.95, 3: 9.95}, aba=lambda m: f"{MESES[int(m[5:7]) - 1].upper()} {m[:4]}", hist='HISTÓRICO',
             cf=[('R', 'cell', [('greaterThanOrEqual', '10', 'FFFF0000'), ('equal', '0', 'FFCC0000')])], cols=[
             ('Data', 14.43, dict(v=lambda r, c: r['_dt'], fmt='mm-dd-yy')), ('Matéria Prima', 35.14, dict(v=lambda r, c: r.get('produto'))), ('Lote', 19.86, dict(v=lambda r, c: numlote(r.get('lote')))),
@@ -193,7 +193,7 @@ def layout(mod):
     def obs_pa(r, c):
         x = ['Cliente: ' + r['cliente'] if r.get('cliente') else ('Estoque' if r.get('destino') == 'estoque' else ''), 'Qtd: ' + qtdTxt(r['qtdCliente'], r.get('qtdUn')) if r.get('qtdCliente') else '']
         return obs(r, ' · '.join(i for i in x if i))
-    return dict(titulo=f"Liberação de Produto Acabado - {mod['fr']} - Rev{mod['_rev']}", tl=3, hdr=6, halt=31.5, zoom=90, escala=80, unico='D', validadata=True, sz=11,
+    return dict(titulo=f"Liberação de Produto Acabado - {mod['fr']} - Rev{mod['_rev']}", tl=3, hdr=6, halt=31.5, zoom=90, escala=80, unico='D', validadata=True, sz=11, ocultas='EFGJKLQRS',
         alturas={1: 9.95, 2: 8.1, 3: 16.35, 4: 16.35}, aba=lambda m: f"{MESES[int(m[5:7]) - 1].upper()} {m[:4]}", hist='HISTÓRICO',
         cf=[('I', 'expr', 'L{r}="N/C"', 'FFFF0000')], cols=[
         ('Data', 14.43, dict(hfill='FFD7E4BD', v=lambda r, c: r['_dt'], fmt='mm-dd-yy')), ('Produto Acabado', 45.86, dict(v=lambda r, c: r.get('produto'))), ('Lote', 19.86, dict(v=lambda r, c: numlote(r.get('lote')))),
@@ -232,6 +232,7 @@ def dados(wb, mod):
     ws = wb.create_sheet(nome, 0); ws.sheet_view.zoomScale = 80; ws.freeze_panes = 'A2'
     for i, (t, w) in enumerate(cols, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
+        if k == 'pi' and i in (3, 4, 6, 7): ws.column_dimensions[get_column_letter(i)].hidden = True
         c = ws.cell(1, i, t); c.font = Font(name='Calibri', size=11, bold=True, color='FF000000' if cab == 'FFFFFFFF' else 'FFFFFFFF'); c.fill = solid(cab); c.border = BORDA; c.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
     ws.row_dimensions[1].height = 48.75 if k == 'mp' else 36
     for j, l in enumerate(linhas, 2):
@@ -250,8 +251,8 @@ def dados(wb, mod):
 def folha(wb, nome, L, mod, recs):
     ws = wb.create_sheet(nome[:31]); ws.sheet_view.zoomScale = L['zoom']
     for i, (_, w, o) in enumerate(L['cols'], 1):
-        cd = ws.column_dimensions[get_column_letter(i)]; cd.width = w
-        if o.get('hide'): cd.hidden = True
+        let = get_column_letter(i); cd = ws.column_dimensions[let]; cd.width = w
+        if (let in L['ocultas']) if 'ocultas' in L else o.get('hide'): cd.hidden = True
     for r, h in L['alturas'].items(): ws.row_dimensions[r].height = h
     t = ws.cell(L['tl'], 1, L['titulo']); t.font = Font(name='Calibri', size=16, bold=True); t.alignment = Alignment(horizontal='left', vertical='center')
     ws.row_dimensions[L['hdr']].height = L['halt']
