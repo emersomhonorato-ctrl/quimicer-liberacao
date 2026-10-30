@@ -294,7 +294,7 @@ dl.kv dd { margin: 0; min-width: 0 }
 html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% } img { max-width: 100% }
 .gate a { color: var(--accent) } .gate a:hover { text-decoration: none }
 </style>
-<script>window.APP_BUILD = '30/10/2026 15:17';</script>
+<script>window.APP_BUILD = '30/10/2026 15:28';</script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 </head>
@@ -2031,7 +2031,7 @@ function frxLayout(mod) {
       ['Laudos PDF', 21.14, { v: (r) => r.laudo?.nome || r.laudoRef || '' }]],
   };
   if (mod.key === 'pi') return {
-    titulo: `Liberação de Produto Intermediário - ${frOf(mod)} – ${revOf(mod)}`, tituloLinha: 2, hdr: 4, hdrAlt: 50.1, zoom: 80, escala: 70, unico: 'D',
+    titulo: `Liberação de Produto Intermediário - ${frOf(mod)} – ${revOf(mod)}`, tituloLinha: 2, hdr: 4, hdrAlt: 50.1, zoom: 80, escala: 70, unico: 'D', ocultas: ['F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'O'],
     alturas: { 1: 9.95, 2: 24.95, 3: 9.95 }, aba: (m) => `${MESES[+m.slice(5, 7) - 1].toUpperCase()} ${m.slice(0, 4)}`, historico: 'HISTÓRICO',
     cf: [{ col: 'R', regras: [['greaterThanOrEqual', 10, 'FFFF0000'], ['equal', 0, 'FFCC0000']] }],
     cols: [
@@ -2052,7 +2052,7 @@ function frxLayout(mod) {
       ['Perda', 15.57, { fmt: '0.00', f: (n, r) => perdaReacao(r) == null ? null : `100-(Z${n}/AA${n}*100)`, v: (r) => { const p = perdaReacao(r); return p == null ? '' : p; } }]],
   };
   return {
-    titulo: `Liberação de Produto Acabado - ${frOf(mod)} - ${revOf(mod)}`, tituloLinha: 3, hdr: 6, hdrAlt: 31.5, zoom: 90, escala: 80, unico: 'D', validaData: true,
+    titulo: `Liberação de Produto Acabado - ${frOf(mod)} - ${revOf(mod)}`, tituloLinha: 3, hdr: 6, hdrAlt: 31.5, zoom: 90, escala: 80, unico: 'D', validaData: true, ocultas: ['E', 'F', 'G', 'J', 'K', 'L', 'Q', 'R', 'S'],
     alturas: { 1: 9.95, 2: 8.1, 3: 16.35, 4: 16.35 }, aba: (m) => `${MESES[+m.slice(5, 7) - 1].toUpperCase()} ${m.slice(0, 4)}`, historico: 'HISTÓRICO', sz: 11,
     cf: [{ col: 'I', expr: 'L{r}="N/C"', cor: 'FFFF0000' }],
     cols: [
@@ -2097,7 +2097,7 @@ function frxDados(wb, mod) {
   }
   const ws = wb.addWorksheet(nome, { views: [{ zoomScale: 80, state: 'frozen', ySplit: 1 }] });
   const borda = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-  cols.forEach(([, w], i) => { ws.getColumn(i + 1).width = w; });
+  cols.forEach(([, w], i) => { const c = ws.getColumn(i + 1); c.width = w; if (mod.key === 'pi' && [2, 3, 5, 6].includes(i)) c.hidden = true; });
   const h = ws.getRow(1); h.height = mod.key === 'mp' ? 48.75 : 36;
   cols.forEach(([t], i) => { const c = h.getCell(i + 1); c.value = t; c.font = { name: 'Calibri', size: 11, bold: true, color: { argb: cab === 'FFFFFFFF' ? 'FF000000' : 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cab } }; c.border = borda; c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
   linhas.forEach((l, k) => { const row = ws.getRow(k + 2); row.height = 18; l.forEach((v, i) => { const c = row.getCell(i + 1); c.value = v === '' ? null : v; c.font = { name: 'Calibri', size: 11 }; c.border = borda; c.alignment = { horizontal: i === 0 && mod.key === 'pa' ? 'left' : 'center', vertical: 'middle', wrapText: true }; if (mod.key === 'pi' && [2, 3, 5, 6].includes(i)) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: FRX_AM } }; }); });
@@ -2115,7 +2115,7 @@ function frxFolha(wb, nome, L, recs) {
   const fonte = (sz, b, cor) => ({ name: 'Calibri', size: sz, bold: !!b, color: { argb: cor || 'FF000000' } });
   const borda = { top: { style: 'thin', color: { argb: 'FF000000' } }, left: { style: 'thin', color: { argb: 'FF000000' } }, bottom: { style: 'thin', color: { argb: 'FF000000' } }, right: { style: 'thin', color: { argb: 'FF000000' } } };
   const solido = (c) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: c } });
-  L.cols.forEach(([, w, o], i) => { const c = ws.getColumn(i + 1); c.width = w; if (o.hide) c.hidden = true; });
+  L.cols.forEach(([, w, o], i) => { const c = ws.getColumn(i + 1); c.width = w; if (L.ocultas ? L.ocultas.includes(c.letter) : o.hide) c.hidden = true; });
   Object.entries(L.alturas).forEach(([r, h]) => { ws.getRow(+r).height = h; });
   const t = ws.getCell(L.tituloLinha, 1); t.value = L.titulo; t.font = fonte(16, true); t.alignment = { horizontal: 'left', vertical: 'middle' };
   const hr = ws.getRow(L.hdr); hr.height = L.hdrAlt;
