@@ -294,7 +294,7 @@ dl.kv dd { margin: 0; min-width: 0 }
 html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% } img { max-width: 100% }
 .gate a { color: var(--accent) } .gate a:hover { text-decoration: none }
 </style>
-<script>window.APP_BUILD = '28/10/2026 17:14';</script>
+<script>window.APP_BUILD = '30/10/2026 14:49';</script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 </head>
@@ -1998,50 +1998,133 @@ async function carregarTudo(mod) {
   }
   return false;
 }
-function planilhaFR(X, mod) {
-  const AV = { ok: 'CONFORME', nc: 'N/C', na: 'N/A', pend: 'NÃO AVALIADO', free: '' };
-  const num = (v) => v == null || v === '' ? '' : v;
-  const cols = ['Data', mod.itemCol, 'Lote', mod.aux.label].concat(mod.validade ? ['Validade', 'Situação da validade'] : []).concat(mod.key === 'pa' ? ['Destino'] : []);
-  mod.fields.forEach(f => { const u = f.unit && f.tipo !== 'aprov' ? ` (${f.k === 'visc' ? 's ou cP' : f.unit})` : ''; if (f.tipo === 'faixa') cols.push(f.nome + u, f.nome + ' mín', f.nome + ' máx', f.nome + ' avaliação'); else cols.push(f.nome + u); });
-  cols.push('Outros ensaios', 'Situação', 'Fora da especificação', 'Nº RNC', 'Status da RNC', 'Analisado por', 'Observação', 'Origem'); if (mod.laudo) cols.push('Laudo');
-  const linha = (r) => {
-    const ev = evalRec(r, mod), sp = specOf(r, mod) || {};
-    const v = [r.data ? new Date(r.data + 'T12:00:00') : '', r.produto || '', r.lote || '', r[mod.aux.k] || ''];
-    if (mod.validade) { const li = lotInfo(r); v.push(li.validade ? new Date(li.validade + 'T12:00:00') : '', VSTAT[li.st]?.[1] || ''); }
-    if (mod.key === 'pa') v.push(r.cliente ? 'Cliente: ' + r.cliente : r.destino === 'estoque' ? 'Estoque' : '');
-    mod.fields.forEach(f => { if (f.tipo === 'faixa') v.push(num(r[f.k]), num(sp[f.mn]), num(sp[f.mx]), AV[ev[f.k]] || ''); else v.push(num(r[f.k])); });
-    v.push((sp.extras || []).map(e => `${e.nome}=${r.extras?.[e.id] == null ? '-' : (typeof r.extras[e.id] === 'number' ? fmt(r.extras[e.id]) : r.extras[e.id])}${e.unidade && e.tipo !== 'aprovacao' ? ' ' + e.unidade : ''} [${AV[ev.x[e.id]] || ''}]`).join(' | '),
-      r.situacao || '', (ev.fora || []).join(', '), r.rnc || '', r.rncStatus || '', r.analista || '', r.obs || '',
-      r._src === 'arquivo' ? `Planilha${r.editadoNoApp ? ' (editado no app)' : ''}` : 'App');
-    if (mod.laudo) v.push(r.laudo?.nome || r.laudoRef || '');
-    return v;
+/* ---------- exportar FR 001 / FR 002 / FR 011 no layout das planilhas originais (ExcelJS) ---------- */
+let EXJSP = null;
+function loadExcelJS() {
+  if (EXJSP) return EXJSP;
+  EXJSP = new Promise((ok, err) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; sc.onload = () => ok(window.ExcelJS); sc.onerror = () => { EXJSP = null; err(new Error('exceljs')); }; document.head.appendChild(sc); });
+  return EXJSP;
+}
+const FRX_AZ = 'FFDBEEF4', FRX_AM = 'FFFFFF00', FRX_VD = 'FFD4EA6B';
+const frxTxt = (v) => v == null || v === '' ? '-' : (typeof v === 'number' ? v : String(v));
+const frxAv = (s) => s === 'ok' ? 'CONFORME' : s === 'nc' ? 'N/C' : 'N/A';
+function frxLayout(mod) {
+  // colunas: [cabeçalho, largura, extra] — extra: { fill, hfill, hcor, hide, sz, wrap, fmt, v(r, ctx) }
+  const sit = (r) => r.situacao || '', rnc = (r) => r.rnc || '', rncSt = (r) => r.rncStatus || '', ana = (r) => r.analista || '';
+  const obs = (r, c, extra) => [r.obs || '', extra || ''].filter(Boolean).join(' · ');
+  if (mod.key === 'mp') return {
+    titulo: `Liberação de Matéria Prima Fornecedor - ${frOf(mod)} - ${revOf(mod)}`, tituloLinha: 2, hdr: 4, hdrAlt: 33.95, zoom: 80,
+    alturas: { 1: 9.95, 2: 24.95, 3: 9.95 }, aba: (m) => `${MESES[+m.slice(5, 7) - 1].toUpperCase()}_${m.slice(0, 4)}`, historico: 'MATERIA_PRIMA',
+    cols: [
+      ['Data', 14.43, { v: (r) => r._dt, fmt: 'mm-dd-yy' }], ['Matéria Prima', 27.14, { v: (r) => r.produto }], ['Lote', 17, { v: (r) => r.lote == null ? '' : String(r.lote), fmt: '@' }],
+      ['Densidade (g/cm³)', 14, { wrap: true, v: (r) => frxTxt(r.dens) }], ['Ph', 9.57, { v: (r) => frxTxt(r.ph) }], ['Colagem', 11.57, { v: (r) => frxTxt(r.colagem) }],
+      ['Viscosidade', 13.14, { v: (r) => frxTxt(r.visc) }], ['Aparência (Visual)', 13, { wrap: true, sz: 11, v: (r) => frxTxt(r.aparencia) }], ['Odor', 13, { v: (r) => frxTxt(r.odor) }],
+      ['Situação', 13, { sz: 11, v: sit }], ['Nº RNC', 11.29, { hfill: 'FFFF0000', hcor: 'FFFFFFFF', v: rnc }], ['Status da RNC', 13, { hfill: 'FF0070C0', hcor: 'FFFFFFFF', wrap: true, v: rncSt }],
+      ['Analisado por:', 13.14, { wrap: true, sz: 11, v: ana }], ['Observação', 36.57, { v: (r) => obs(r, null, [r.fornecedor ? 'Fornecedor: ' + r.fornecedor : '', lotInfo(r).validade ? 'Validade: ' + dataBR(lotInfo(r).validade) : ''].filter(Boolean).join(' · ')) }],
+      ['Laudos PDF', 21.14, { v: (r) => r.laudo?.nome || r.laudoRef || '' }]],
   };
+  if (mod.key === 'pi') return {
+    titulo: `Liberação de Produto Intermediário - ${frOf(mod)} – ${revOf(mod)}`, tituloLinha: 2, hdr: 4, hdrAlt: 50.1, zoom: 80,
+    alturas: { 1: 9.95, 2: 24.95, 3: 9.95 }, aba: (m) => `${MESES[+m.slice(5, 7) - 1].toUpperCase()} ${m.slice(0, 4)}`, historico: 'HISTÓRICO',
+    cf: [{ col: 'R', regras: [['greaterThanOrEqual', 10, 'FFFF0000'], ['equal', 0, 'FFCC0000']] }],
+    cols: [
+      ['Data', 14.43, { v: (r) => r._dt, fmt: 'mm-dd-yy' }], ['Matéria Prima', 35.14, { v: (r) => r.produto }], ['Lote', 19.86, { v: (r) => frxNum(r.lote) }],
+      ['Ordem de Produção (Nº)', 14, { wrap: true, sz: 11, v: (r) => frxTxt(r.op) }], ['Densidade (g/cm³)', 16.71, { wrap: true, v: (r) => frxTxt(r.dens) }],
+      ['', 8.29, { wrap: true, hide: true, v: () => '' }],
+      ['Dm', 13, { wrap: true, sz: 11, fill: FRX_AM, v: (r, c) => frxTxt(c.sp.densMin ?? 'N/A') }], ['DM', 13, { wrap: true, sz: 11, fill: FRX_AM, v: (r, c) => frxTxt(c.sp.densMax ?? 'N/A') }],
+      ['status', 11.29, { wrap: true, sz: 11, fill: FRX_AM, hide: true, v: (r, c) => frxAv(c.ev.dens) }],
+      ['Ph', 8.29, { v: (r) => frxTxt(r.ph) }], ['', 14.57, { hide: true, v: () => '' }], ['', 13, { v: () => '' }],
+      ['Phm', 13, { wrap: true, sz: 11, fill: FRX_AM, v: (r, c) => frxTxt(c.sp.phMin ?? 'N/A') }], ['PHM', 13, { wrap: true, sz: 11, fill: FRX_AM, v: (r, c) => frxTxt(c.sp.phMax ?? 'N/A') }],
+      ['status', 13, { wrap: true, sz: 11, fill: FRX_AM, v: (r, c) => frxAv(c.ev.ph) }],
+      ['Aparência (Visual)', 14.57, { wrap: true, sz: 11, v: (r) => frxTxt(r.aparencia) }], ['Teste Colagem', 13.29, { wrap: true, v: (r) => frxTxt(r.colagem) }],
+      ['Umidade', 13.14, { v: (r) => frxTxt(r.umid) }], ['Defloculação', 14.43, { v: (r) => frxTxt(r.defloc) }],
+      ['Resíduo (%) *Copiar valores realizados no processo', 15.86, { hfill: 'FF31859C', hcor: 'FFFFFFFF', wrap: true, v: (r) => r.residuo == null || r.residuo === '' ? '' : r.residuo }],
+      ['Situação', 13.14, { sz: 11, v: sit }], ['Nº RNC', 8.57, { hfill: 'FFFF0000', hcor: 'FFFFFFFF', v: rnc }], ['Status da RNC', 6.29, { hfill: 'FF0070C0', hcor: 'FFFFFFFF', wrap: true, v: rncSt }],
+      ['Analisado por:', 13.14, { wrap: true, sz: 11, v: ana }], ['Observação', 31.86, { v: (r) => obs(r, null, r.visc != null && r.visc !== '' ? 'Viscosidade: ' + fmt(r.visc) : '') }],
+      ['Peso Final', 13.86, { v: (r) => r.pesoFin == null || r.pesoFin === '' ? '' : r.pesoFin }], ['Peso Inicial', 11.43, { v: (r) => r.pesoIni == null || r.pesoIni === '' ? '' : r.pesoIni }],
+      ['Perda', 15.57, { fmt: '0.00', v: (r) => { const p = perdaReacao(r); return p == null ? '' : p; } }]],
+  };
+  return {
+    titulo: `Liberação de Produto Acabado - ${frOf(mod)} - ${revOf(mod)}`, tituloLinha: 3, hdr: 6, hdrAlt: 31.5, zoom: 90,
+    alturas: { 1: 9.95, 2: 8.1, 3: 16.35, 4: 16.35 }, aba: (m) => `${MESES[+m.slice(5, 7) - 1].toUpperCase()} ${m.slice(0, 4)}`, historico: 'HISTÓRICO', sz: 11,
+    cf: [{ col: 'H', expr: 'K{r}="N/C"', cor: 'FFFF0000' }],
+    cols: [
+      ['Data', 14.43, { hfill: 'FFD7E4BD', v: (r) => r._dt, fmt: 'mm-dd-yy' }], ['Produto Acabado', 45.86, { v: (r) => r.produto }], ['Lote', 19.86, { v: (r) => frxNum(r.lote) }],
+      ['', 6.57, { hfill: FRX_AM, fill: FRX_AM, wrap: true, hide: true, v: (r, c) => frxTxt(c.sp.densMin ?? 'N/A') }], ['', 13, { hfill: FRX_AM, fill: FRX_AM, wrap: true, v: (r, c) => frxTxt(c.sp.densMax ?? 'N/A') }],
+      ['', 21.14, { hfill: FRX_AM, fill: FRX_AM, wrap: true, hide: true, v: (r, c) => frxAv(c.ev.dens) }],
+      ['Densidade (g/cm³)', 21.14, { wrap: true, fill: 'FFFFFFFF', fmt: '0.00', v: (r) => frxTxt(r.dens) }], ['Ph', 8.29, { v: (r) => frxTxt(r.ph) }],
+      ['ph minimo', 16.57, { hfill: FRX_AM, fill: FRX_AM, hide: true, v: (r, c) => frxTxt(c.sp.phMin ?? 'N/A') }], ['ph máximo', 13, { hfill: FRX_AM, fill: FRX_AM, v: (r, c) => frxTxt(c.sp.phMax ?? 'N/A') }],
+      ['', 13, { hfill: FRX_AM, fill: FRX_AM, v: (r, c) => frxAv(c.ev.ph) }],
+      ['Viscosidade (s)', 16.57, { v: (r) => frxTxt(r.visc) }], ['Teste  Impermeabilidade', 14.86, { v: (r) => frxTxt(r.imperm) }], ['Umidade', 13.14, { v: (r) => frxTxt(r.umid) }],
+      ['Teste de colagem', 13, { v: (r) => frxTxt(r.colagem) }],
+      ['', 13.14, { hfill: FRX_VD, fill: FRX_VD, hide: true, v: (r, c) => frxTxt(c.sp.viscMin ?? 'N/A') }], ['', 13, { hfill: FRX_VD, fill: FRX_VD, v: (r, c) => frxTxt(c.sp.viscMax ?? 'N/A') }],
+      ['', 13, { hfill: FRX_VD, fill: FRX_VD, v: (r, c) => frxAv(c.ev.visc) }],
+      ['Aparência (Visual)', 16, { wrap: true, v: (r) => frxTxt(r.aparencia) }], ['Situação', 13.14, { v: sit }],
+      ['Nº RNC', 11.29, { hfill: 'FFFF0000', hcor: 'FFFFFFFF', v: rnc }], ['Status da RNC', 13, { hfill: 'FF0070C0', hcor: 'FFFFFFFF', wrap: true, v: rncSt }],
+      ['Analisado por:', 13.14, { wrap: true, v: ana }],
+      ['Observação', 50, { v: (r) => obs(r, null, [r.op ? 'OP ' + r.op : '', r.cliente ? 'Cliente: ' + r.cliente : r.destino === 'estoque' ? 'Estoque' : '', r.qtdCliente ? 'Qtd: ' + qtdTxt(r.qtdCliente, r.qtdUn) : ''].filter(Boolean).join(' · ')) }]],
+  };
+}
+const frxNum = (v) => { if (v == null || v === '') return ''; const s = String(v).trim(); return /^\d{1,15}$/.test(s) && !/^0\d/.test(s) ? Number(s) : s; };
+const revOf = (mod) => (codeOf(mod).split('·')[1] || '').trim() || 'Rev00';
+function frxFolha(wb, nome, L, recs) {
+  const ws = wb.addWorksheet(nome.slice(0, 31), { views: [{ zoomScale: L.zoom, showGridLines: true }], properties: { defaultRowHeight: 15.75 } });
+  const fonte = (sz, b, cor) => ({ name: 'Calibri', size: sz, bold: !!b, color: { argb: cor || 'FF000000' } });
+  const borda = { top: { style: 'thin', color: { argb: 'FF000000' } }, left: { style: 'thin', color: { argb: 'FF000000' } }, bottom: { style: 'thin', color: { argb: 'FF000000' } }, right: { style: 'thin', color: { argb: 'FF000000' } } };
+  const solido = (c) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: c } });
+  L.cols.forEach(([, w, o], i) => { const c = ws.getColumn(i + 1); c.width = w; if (o.hide) c.hidden = true; });
+  Object.entries(L.alturas).forEach(([r, h]) => { ws.getRow(+r).height = h; });
+  const t = ws.getCell(L.tituloLinha, 1); t.value = L.titulo; t.font = fonte(16, true); t.alignment = { horizontal: 'left', vertical: 'middle' };
+  const hr = ws.getRow(L.hdr); hr.height = L.hdrAlt;
+  L.cols.forEach(([h, , o], i) => { const c = hr.getCell(i + 1); c.value = h || null; c.font = fonte(12, true, o.hcor); c.fill = solido(o.hfill || FRX_AZ); c.border = borda; c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: !!o.wrap }; });
+  recs.forEach((r, k) => {
+    const ctx = { ev: evalRec(r, MODS[L.key]), sp: specOf(r, MODS[L.key]) || {} };
+    const row = ws.getRow(L.hdr + 1 + k);
+    L.cols.forEach(([, , o], i) => {
+      const c = row.getCell(i + 1); let v = o.v(r, ctx); if (v === undefined) v = '';
+      c.value = v === '' ? null : v;
+      if (o.fmt) c.numFmt = o.fmt;
+      c.font = fonte(o.sz || L.sz || 12); c.border = borda; c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: !!o.wrap };
+      if (o.fill) c.fill = solido(o.fill);
+    });
+  });
+  const last = L.hdr + Math.max(recs.length, 1);
+  (L.cf || []).forEach(cf => {
+    const ref = `${cf.col}${L.hdr + 1}:${cf.col}${last}`;
+    if (cf.regras) ws.addConditionalFormatting({ ref, rules: cf.regras.map(([op, val, cor], p) => ({ type: 'cellIs', operator: op, formulae: [String(val)], priority: p + 1, style: { font: { color: { argb: cor } } } })) });
+    else ws.addConditionalFormatting({ ref, rules: [{ type: 'expression', formulae: [cf.expr.replace('{r}', String(L.hdr + 1))], priority: 1, style: { font: { color: { argb: cf.cor } } } }] });
+  });
+  ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
+  return ws;
+}
+function frxNomeArquivo(mod) {
+  const d = new Date(), p2 = (n) => String(n).padStart(2, '0');
+  const titulo = { mp: 'Liberação de Matéria Prima Fornecedor', pi: 'Liberação de Produto Intermediário', pa: 'Liberação de Produto Acabado' }[mod.key];
+  return `${frOf(mod).replace(' ', '_')}_${titulo} - ${revOf(mod).replace('Rev', 'Rev ')} - ${p2(d.getDate())}-${p2(d.getMonth() + 1)}-${d.getFullYear()}_${p2(d.getHours())}h${p2(d.getMinutes())}.xlsx`;
+}
+async function planilhaFR(EX, mod) {
+  const L = Object.assign(frxLayout(mod), { key: mod.key });
   const ordem = (a, b) => (a.data || '').localeCompare(b.data || '') || String(a.lote).localeCompare(String(b.lote), 'pt', { numeric: true });
-  const titulo = `${codeOf(mod)} · ${mod.title}`;
-  const folha = (recs, sub) => {
-    const ws = X.utils.aoa_to_sheet([[titulo], [sub], [], cols, ...recs.map(linha)], { cellDates: true });
-    ws['!cols'] = cols.map((c, i) => ({ wch: i === 1 ? 34 : /Observação|Outros|Laudo/.test(c) ? 40 : Math.max(9, Math.min(22, c.length + 2)) }));
-    ws['!autofilter'] = { ref: X.utils.encode_range({ s: { r: 3, c: 0 }, e: { r: 3 + Math.max(recs.length, 1), c: cols.length - 1 } }) };
-    const rg = X.utils.decode_range(ws['!ref']);
-    for (let R = 4; R <= rg.e.r; R++) for (const C of [0].concat(mod.validade ? [4] : [])) { const c = ws[X.utils.encode_cell({ r: R, c: C })]; if (c && c.t === 'd') c.z = 'dd/mm/yyyy'; }
-    return ws;
-  };
-  const wb = X.utils.book_new(); const todos = allRecs('ALL', mod).sort(ordem);
-  const quem = ACC.me?.nome || '';
-  X.utils.book_append_sheet(wb, folha(todos, `Todos os meses · ${todos.length} lotes · exportado em ${dataBR(hoje())}${quem ? ' por ' + quem : ''}`), 'Todos');
-  allMonths(mod).slice().reverse().forEach(m => { const l = allRecs(m, mod).sort(ordem); if (l.length) X.utils.book_append_sheet(wb, folha(l, `${mesLabel(m)} · ${l.length} lotes`), mesLabel(m).toUpperCase().slice(0, 31)); });
-  wb.Props = { Title: titulo, Author: 'Quimicer' };
-  return { nome: `${frOf(mod).replace(' ', '_')}_${slug(mod.title)}_${hoje()}.xlsx`, data: new Blob([X.write(wb, { type: 'array', bookType: 'xlsx', cellDates: true })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) };
+  const prep = (r) => ({ ...r, _dt: r.data ? new Date(Date.UTC(+r.data.slice(0, 4), +r.data.slice(5, 7) - 1, +r.data.slice(8, 10))) : null });
+  const wb = new EX.Workbook(); wb.creator = ACC.me?.nome || 'Quimicer'; wb.created = new Date(); wb.title = L.titulo;
+  const meses = allMonths(mod).slice().sort(), ano = String(new Date().getFullYear());
+  const antigos = meses.filter(m => m.slice(0, 4) < ano), atuais = meses.filter(m => m.slice(0, 4) >= ano);
+  if (antigos.length) frxFolha(wb, L.historico, L, antigos.flatMap(m => allRecs(m, mod)).sort(ordem).map(prep));
+  atuais.forEach(m => { const l = allRecs(m, mod).sort(ordem).map(prep); if (l.length) frxFolha(wb, L.aba(m), L, l); });
+  if (!wb.worksheets.length) frxFolha(wb, L.aba(hoje().slice(0, 7)), L, []);
+  wb.views = [{ activeTab: wb.worksheets.length - 1 }];
+  const buf = await wb.xlsx.writeBuffer();
+  return { nome: frxNomeArquivo(mod), data: new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) };
 }
 async function exportarFR(keys, btn) {
   if (!S.downloads) { toast('Download indisponível nesta visualização.'); return; }
-  let X; try { X = await loadXlsx(); } catch { toast('Não foi possível carregar o gerador de Excel. Verifique a internet.'); return; }
+  let EX; try { EX = await loadExcelJS(); } catch { toast('Não foi possível carregar o gerador de Excel. Verifique a internet.'); return; }
   const txt = btn.textContent; btn.disabled = true;
   try {
     for (const k of keys) {
       const mod = MODS[k]; btn.textContent = `Preparando ${frOf(mod)}…`;
       if (!await carregarTudo(mod)) { toast(`Os registros da ${frOf(mod)} ainda não carregaram. Tente de novo.`); continue; }
-      const r = planilhaFR(X, mod);
+      const r = await planilhaFR(EX, mod);
       try { await S.downloads.save({ filename: r.nome, data: r.data }); } catch (x) { if (x?.code === 'declined') break; throw x; }
     }
   } catch (x) { console.warn(x); toast('Não foi possível gerar a planilha.'); }
