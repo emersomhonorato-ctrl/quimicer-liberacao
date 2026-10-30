@@ -294,7 +294,7 @@ dl.kv dd { margin: 0; min-width: 0 }
 html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% } img { max-width: 100% }
 .gate a { color: var(--accent) } .gate a:hover { text-decoration: none }
 </style>
-<script>window.APP_BUILD = '30/10/2026 15:08';</script>
+<script>window.APP_BUILD = '30/10/2026 15:17';</script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 </head>
@@ -2007,13 +2007,20 @@ function loadExcelJS() {
 }
 const FRX_AZ = 'FFDBEEF4', FRX_AM = 'FFFFFF00', FRX_VD = 'FFD4EA6B';
 const frxTxt = (v) => v == null || v === '' ? '-' : (typeof v === 'number' ? v : String(v));
+// mesmo resultado da fórmula da planilha: IF(AND(v>=min,v<=max),"CONFORME",IF(min="N/A","N/A","N/C")) — no Excel texto é maior que número
+function frxSt(v, mn, mx) {
+  const val = frxTxt(v), a = frxTxt(mn ?? 'N/A'), b = frxTxt(mx ?? 'N/A');
+  const ge = (x, y) => typeof x === typeof y ? (typeof x === 'number' ? x >= y : String(x).toUpperCase() >= String(y).toUpperCase()) : typeof x === 'string';
+  const le = (x, y) => typeof x === typeof y ? (typeof x === 'number' ? x <= y : String(x).toUpperCase() <= String(y).toUpperCase()) : typeof x === 'number';
+  return ge(val, a) && le(val, b) ? 'CONFORME' : a === 'N/A' ? 'N/A' : 'N/C';
+}
 const frxAv = (s) => s === 'ok' ? 'CONFORME' : s === 'nc' ? 'N/C' : 'N/A';
 function frxLayout(mod) {
   // colunas: [cabeçalho, largura, extra] — extra: { fill, hfill, hcor, hide, sz, wrap, fmt, v(r, ctx) }
   const sit = (r) => r.situacao || '', rnc = (r) => r.rnc || '', rncSt = (r) => r.rncStatus || '', ana = (r) => r.analista || '';
   const obs = (r, c, extra) => [r.obs || '', extra || ''].filter(Boolean).join(' · ');
   if (mod.key === 'mp') return {
-    titulo: `Liberação de Matéria Prima Fornecedor - ${frOf(mod)} - ${revOf(mod)}`, tituloLinha: 2, hdr: 4, hdrAlt: 33.95, zoom: 80,
+    titulo: `Liberação de Matéria Prima Fornecedor - ${frOf(mod)} - ${revOf(mod)}`, tituloLinha: 2, hdr: 4, hdrAlt: 33.95, zoom: 80, escala: 80, altLinha: 17.85,
     alturas: { 1: 9.95, 2: 24.95, 3: 9.95 }, aba: (m) => `${MESES[+m.slice(5, 7) - 1].toUpperCase()}_${m.slice(0, 4)}`, historico: 'MATERIA_PRIMA',
     cols: [
       ['Data', 14.43, { v: (r) => r._dt, fmt: 'mm-dd-yy' }], ['Matéria Prima', 27.14, { v: (r) => r.produto }], ['Lote', 17, { v: (r) => r.lote == null ? '' : String(r.lote), fmt: '@' }],
@@ -2024,48 +2031,83 @@ function frxLayout(mod) {
       ['Laudos PDF', 21.14, { v: (r) => r.laudo?.nome || r.laudoRef || '' }]],
   };
   if (mod.key === 'pi') return {
-    titulo: `Liberação de Produto Intermediário - ${frOf(mod)} – ${revOf(mod)}`, tituloLinha: 2, hdr: 4, hdrAlt: 50.1, zoom: 80,
+    titulo: `Liberação de Produto Intermediário - ${frOf(mod)} – ${revOf(mod)}`, tituloLinha: 2, hdr: 4, hdrAlt: 50.1, zoom: 80, escala: 70, unico: 'D',
     alturas: { 1: 9.95, 2: 24.95, 3: 9.95 }, aba: (m) => `${MESES[+m.slice(5, 7) - 1].toUpperCase()} ${m.slice(0, 4)}`, historico: 'HISTÓRICO',
     cf: [{ col: 'R', regras: [['greaterThanOrEqual', 10, 'FFFF0000'], ['equal', 0, 'FFCC0000']] }],
     cols: [
       ['Data', 14.43, { v: (r) => r._dt, fmt: 'mm-dd-yy' }], ['Matéria Prima', 35.14, { v: (r) => r.produto }], ['Lote', 19.86, { v: (r) => frxNum(r.lote) }],
       ['Ordem de Produção (Nº)', 14, { wrap: true, sz: 11, v: (r) => frxTxt(r.op) }], ['Densidade (g/cm³)', 16.71, { wrap: true, v: (r) => frxTxt(r.dens) }],
       ['', 8.29, { wrap: true, hide: true, v: () => '' }],
-      ['Dm', 13, { wrap: true, sz: 11, fill: FRX_AM, v: (r, c) => frxTxt(c.sp.densMin ?? 'N/A') }], ['DM', 13, { wrap: true, sz: 11, fill: FRX_AM, v: (r, c) => frxTxt(c.sp.densMax ?? 'N/A') }],
-      ['status', 11.29, { wrap: true, sz: 11, fill: FRX_AM, hide: true, v: (r, c) => frxAv(c.ev.dens) }],
+      ['Dm', 13, { wrap: true, sz: 11, fill: FRX_AM, f: (n) => `VLOOKUP(B${n},bancoquimicer,2,0)`, v: (r, c) => frxTxt(c.sp.densMin ?? 'N/A') }], ['DM', 13, { wrap: true, sz: 11, fill: FRX_AM, f: (n) => `VLOOKUP(B${n},bancoquimicer,3,0)`, v: (r, c) => frxTxt(c.sp.densMax ?? 'N/A') }],
+      ['status', 11.29, { wrap: true, sz: 11, fill: FRX_AM, hide: true, f: (n) => `IF(AND(E${n}>=G${n},E${n}<=H${n}),"CONFORME",IF(G${n}="N/A","N/A","N/C"))`, v: (r, c) => frxSt(r.dens, c.sp.densMin, c.sp.densMax) }],
       ['Ph', 8.29, { v: (r) => frxTxt(r.ph) }], ['', 14.57, { hide: true, v: () => '' }], ['', 13, { v: () => '' }],
-      ['Phm', 13, { wrap: true, sz: 11, fill: FRX_AM, v: (r, c) => frxTxt(c.sp.phMin ?? 'N/A') }], ['PHM', 13, { wrap: true, sz: 11, fill: FRX_AM, v: (r, c) => frxTxt(c.sp.phMax ?? 'N/A') }],
-      ['status', 13, { wrap: true, sz: 11, fill: FRX_AM, v: (r, c) => frxAv(c.ev.ph) }],
+      ['Phm', 13, { wrap: true, sz: 11, fill: FRX_AM, f: (n) => `VLOOKUP(B${n},bancoquimicer,5,0)`, v: (r, c) => frxTxt(c.sp.phMin ?? 'N/A') }], ['PHM', 13, { wrap: true, sz: 11, fill: FRX_AM, f: (n) => `VLOOKUP(B${n},bancoquimicer,6,0)`, v: (r, c) => frxTxt(c.sp.phMax ?? 'N/A') }],
+      ['status', 13, { wrap: true, sz: 11, fill: FRX_AM, f: (n) => `IF(AND(J${n}>=M${n},J${n}<=N${n}),"CONFORME",IF(M${n}="N/A","N/A","N/C"))`, v: (r, c) => frxSt(r.ph, c.sp.phMin, c.sp.phMax) }],
       ['Aparência (Visual)', 14.57, { wrap: true, sz: 11, v: (r) => frxTxt(r.aparencia) }], ['Teste Colagem', 13.29, { wrap: true, v: (r) => frxTxt(r.colagem) }],
       ['Umidade', 13.14, { v: (r) => frxTxt(r.umid) }], ['Defloculação', 14.43, { v: (r) => frxTxt(r.defloc) }],
       ['Resíduo (%) *Copiar valores realizados no processo', 15.86, { hfill: 'FF31859C', hcor: 'FFFFFFFF', wrap: true, v: (r) => r.residuo == null || r.residuo === '' ? '' : r.residuo }],
       ['Situação', 13.14, { sz: 11, v: sit }], ['Nº RNC', 8.57, { hfill: 'FFFF0000', hcor: 'FFFFFFFF', v: rnc }], ['Status da RNC', 6.29, { hfill: 'FF0070C0', hcor: 'FFFFFFFF', wrap: true, v: rncSt }],
       ['Analisado por:', 13.14, { wrap: true, sz: 11, v: ana }], ['Observação', 31.86, { v: (r) => obs(r, null, r.visc != null && r.visc !== '' ? 'Viscosidade: ' + fmt(r.visc) : '') }],
       ['Peso Final', 13.86, { v: (r) => r.pesoFin == null || r.pesoFin === '' ? '' : r.pesoFin }], ['Peso Inicial', 11.43, { v: (r) => r.pesoIni == null || r.pesoIni === '' ? '' : r.pesoIni }],
-      ['Perda', 15.57, { fmt: '0.00', v: (r) => { const p = perdaReacao(r); return p == null ? '' : p; } }]],
+      ['Perda', 15.57, { fmt: '0.00', f: (n, r) => perdaReacao(r) == null ? null : `100-(Z${n}/AA${n}*100)`, v: (r) => { const p = perdaReacao(r); return p == null ? '' : p; } }]],
   };
   return {
-    titulo: `Liberação de Produto Acabado - ${frOf(mod)} - ${revOf(mod)}`, tituloLinha: 3, hdr: 6, hdrAlt: 31.5, zoom: 90,
+    titulo: `Liberação de Produto Acabado - ${frOf(mod)} - ${revOf(mod)}`, tituloLinha: 3, hdr: 6, hdrAlt: 31.5, zoom: 90, escala: 80, unico: 'D', validaData: true,
     alturas: { 1: 9.95, 2: 8.1, 3: 16.35, 4: 16.35 }, aba: (m) => `${MESES[+m.slice(5, 7) - 1].toUpperCase()} ${m.slice(0, 4)}`, historico: 'HISTÓRICO', sz: 11,
     cf: [{ col: 'I', expr: 'L{r}="N/C"', cor: 'FFFF0000' }],
     cols: [
       ['Data', 14.43, { hfill: 'FFD7E4BD', v: (r) => r._dt, fmt: 'mm-dd-yy' }], ['Produto Acabado', 45.86, { v: (r) => r.produto }], ['Lote', 19.86, { v: (r) => frxNum(r.lote) }],
       ['Ordem de Produção (Nº)', 13, { wrap: true, v: (r) => frxTxt(r.op) }],
-      ['', 6.57, { hfill: FRX_AM, fill: FRX_AM, wrap: true, hide: true, v: (r, c) => frxTxt(c.sp.densMin ?? 'N/A') }], ['', 13, { hfill: FRX_AM, fill: FRX_AM, wrap: true, v: (r, c) => frxTxt(c.sp.densMax ?? 'N/A') }],
-      ['', 21.14, { hfill: FRX_AM, fill: FRX_AM, wrap: true, hide: true, v: (r, c) => frxAv(c.ev.dens) }],
+      ['', 6.57, { hfill: FRX_AM, fill: FRX_AM, wrap: true, hide: true, f: (n) => `VLOOKUP(B${n},Tabeladados,3,0)`, v: (r, c) => frxTxt(c.sp.densMin ?? 'N/A') }], ['', 13, { hfill: FRX_AM, fill: FRX_AM, wrap: true, f: (n) => `VLOOKUP(B${n},Tabeladados,4,0)`, v: (r, c) => frxTxt(c.sp.densMax ?? 'N/A') }],
+      ['', 21.14, { hfill: FRX_AM, fill: FRX_AM, wrap: true, hide: true, f: (n) => `IF(AND(H${n}>=E${n},H${n}<=F${n}),"CONFORME",IF(E${n}="N/A","N/A","N/C"))`, v: (r, c) => frxSt(r.dens, c.sp.densMin, c.sp.densMax) }],
       ['Densidade (g/cm³)', 21.14, { wrap: true, fill: 'FFFFFFFF', fmt: '0.00', v: (r) => frxTxt(r.dens) }], ['Ph', 8.29, { v: (r) => frxTxt(r.ph) }],
-      ['ph minimo', 16.57, { hfill: FRX_AM, fill: FRX_AM, hide: true, v: (r, c) => frxTxt(c.sp.phMin ?? 'N/A') }], ['ph máximo', 13, { hfill: FRX_AM, fill: FRX_AM, v: (r, c) => frxTxt(c.sp.phMax ?? 'N/A') }],
-      ['', 13, { hfill: FRX_AM, fill: FRX_AM, v: (r, c) => frxAv(c.ev.ph) }],
+      ['ph minimo', 16.57, { hfill: FRX_AM, fill: FRX_AM, hide: true, f: (n) => `VLOOKUP($B${n},Tabeladados,7,0)`, v: (r, c) => frxTxt(c.sp.phMin ?? 'N/A') }], ['ph máximo', 13, { hfill: FRX_AM, fill: FRX_AM, f: (n) => `VLOOKUP($B${n},Tabeladados,8,0)`, v: (r, c) => frxTxt(c.sp.phMax ?? 'N/A') }],
+      ['', 13, { hfill: FRX_AM, fill: FRX_AM, f: (n) => `IF(AND(I${n}>=J${n},I${n}<=K${n}),"CONFORME",IF(J${n}="N/A","N/A","N/C"))`, v: (r, c) => frxSt(r.ph, c.sp.phMin, c.sp.phMax) }],
       ['Viscosidade (s)', 16.57, { v: (r) => frxTxt(r.visc) }], ['Teste  Impermeabilidade', 14.86, { v: (r) => frxTxt(r.imperm) }], ['Umidade', 13.14, { v: (r) => frxTxt(r.umid) }],
       ['Teste de colagem', 13, { v: (r) => frxTxt(r.colagem) }],
-      ['', 13.14, { hfill: FRX_VD, fill: FRX_VD, hide: true, v: (r, c) => frxTxt(c.sp.viscMin ?? 'N/A') }], ['', 13, { hfill: FRX_VD, fill: FRX_VD, v: (r, c) => frxTxt(c.sp.viscMax ?? 'N/A') }],
-      ['', 13, { hfill: FRX_VD, fill: FRX_VD, v: (r, c) => frxAv(c.ev.visc) }],
+      ['', 13.14, { hfill: FRX_VD, fill: FRX_VD, hide: true, f: (n) => `VLOOKUP($B${n},Tabeladados,11,0)`, v: (r, c) => frxTxt(c.sp.viscMin ?? 'N/A') }], ['', 13, { hfill: FRX_VD, fill: FRX_VD, f: (n) => `VLOOKUP($B${n},Tabeladados,12,0)`, v: (r, c) => frxTxt(c.sp.viscMax ?? 'N/A') }],
+      ['', 13, { hfill: FRX_VD, fill: FRX_VD, f: (n) => `IF(AND(M${n}>=Q${n},M${n}<=R${n}),"CONFORME",IF(Q${n}="N/A","N/A","N/C"))`, v: (r, c) => frxSt(r.visc, c.sp.viscMin, c.sp.viscMax) }],
       ['Aparência (Visual)', 16, { wrap: true, v: (r) => frxTxt(r.aparencia) }], ['Situação', 13.14, { v: sit }],
       ['Nº RNC', 11.29, { hfill: 'FFFF0000', hcor: 'FFFFFFFF', v: rnc }], ['Status da RNC', 13, { hfill: 'FF0070C0', hcor: 'FFFFFFFF', wrap: true, v: rncSt }],
       ['Analisado por:', 13.14, { wrap: true, v: ana }],
       ['Observação', 50, { v: (r) => obs(r, null, [r.cliente ? 'Cliente: ' + r.cliente : r.destino === 'estoque' ? 'Estoque' : '', r.qtdCliente ? 'Qtd: ' + qtdTxt(r.qtdCliente, r.qtdUn) : ''].filter(Boolean).join(' · ')) }]],
   };
 }
+
+function frxDados(wb, mod) {
+  const fx = (a, b) => a == null || b == null ? '-' : `${fmt(a)} a ${fmt(b)}`;
+  const nz = (v) => v == null || v === '' ? 'N/A' : v;
+  const tx = (v) => v == null || String(v).trim() === '' ? '-' : String(v);
+  const itens = [...D[mod.key].itens.values()].filter(p => p.ativo !== false).sort((a, b) => a.nome.localeCompare(b.nome, 'pt', { numeric: true }));
+  let nome, cols, linhas, faixa, cab = 'FF215968';
+  if (mod.key === 'pa') {
+    nome = 'DADOS_01';
+    cols = [['PRODUTO', 47.3], ['DENSIDADE  (g/mL)', 13.3], ['DENSIDADE  (g/mL) minima', 18.1], ['DENSIDADE  (g/mL) máxima', 13], ['VISCOSIDADE (s)', 23.7], ['p.H', 16.6], ['p.H minimo', 19.6], ['p.H máximo', 16], ['ANÁLISE VISUAL', 41.6], ['TESTE DE APLICAÇÃO (COLAGEM)', 22.4], ['VISCOSIDADE (s)MINIMA', 22.9], ['VISCOSIDADE (s)MAXIMA', 13], ['umidade', 22.3]];
+    linhas = itens.map(p => [p.nome, fx(p.densMin, p.densMax), nz(p.densMin), nz(p.densMax), fx(p.viscMin, p.viscMax) + (p.viscCopo ? ' ' + p.viscCopo : ''), fx(p.phMin, p.phMax), nz(p.phMin), nz(p.phMax), tx(p.visual), tx(p.colagem), nz(p.viscMin), nz(p.viscMax), tx(p.umidade)]);
+    faixa = 'Tabeladados';
+  } else if (mod.key === 'pi') {
+    nome = 'DADOS';
+    cols = [['Código MP', 15.6], ['Produto Intermediário         (Nome Usual)', 34.4], ['DENS. MIN', 13.4], ['DENS. MAX', 13], ['Densidade (g/mL)', 13.4], ['PH MIN', 13.4], ['PH MAX', 13], ['p.H', 13.4], ['Viscosidade', 13.6], ['Aparência (visual)', 33.9], ['Teste de Aplicação  (Colagem)', 18.7], ['Umidade', 13.4], ['Defloculação', 13], ['Resíduo (%)', 25.7]];
+    linhas = itens.map(p => [p.codigo || '', p.nome, nz(p.densMin), nz(p.densMax), fx(p.densMin, p.densMax), nz(p.phMin), nz(p.phMax), fx(p.phMin, p.phMax), fx(p.viscMin, p.viscMax), tx(p.visual), tx(p.colagem), p.umidMin != null ? fx(p.umidMin, p.umidMax) : tx(p.umidade), tx(p.defloculacao), p.resMin != null ? fx(p.resMin, p.resMax) : tx(p.residuo)]);
+    faixa = 'bancoquimicer';
+  } else {
+    nome = 'DADOS'; cab = 'FFFFFFFF';
+    cols = [['Código MP', 11.6], ['Matérias-Primas\n(Nome Usual)', 13.7], ['Colunas1', 23.1], ['Densidade  (g/mL)', 18], ['pH', 10], ['Odor', 13.6], ['\nTeste de Aplicação Colagem', 12.1], ['Aparência (visual)', 46.3], ['Análise  de espuma em proveta', 38.7], ['\nDeflocução', 17.9], ['LAUDO', 13.4], ['TESTE IMPERMEABILIDADE', 29.1], ['VISCOSIDADE', 31.6]];
+    linhas = itens.map(p => [p.codigo ? frxNum(p.codigo) : '', p.nome, '', fx(p.densMin, p.densMax), fx(p.phMin, p.phMax), tx(p.odor), tx(p.colagem), tx(p.visual), '-', '-', laudosDe(p.nome).length ? 'SIM' : '-', '-', fx(p.viscMin, p.viscMax)]);
+  }
+  const ws = wb.addWorksheet(nome, { views: [{ zoomScale: 80, state: 'frozen', ySplit: 1 }] });
+  const borda = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+  cols.forEach(([, w], i) => { ws.getColumn(i + 1).width = w; });
+  const h = ws.getRow(1); h.height = mod.key === 'mp' ? 48.75 : 36;
+  cols.forEach(([t], i) => { const c = h.getCell(i + 1); c.value = t; c.font = { name: 'Calibri', size: 11, bold: true, color: { argb: cab === 'FFFFFFFF' ? 'FF000000' : 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cab } }; c.border = borda; c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
+  linhas.forEach((l, k) => { const row = ws.getRow(k + 2); row.height = 18; l.forEach((v, i) => { const c = row.getCell(i + 1); c.value = v === '' ? null : v; c.font = { name: 'Calibri', size: 11 }; c.border = borda; c.alignment = { horizontal: i === 0 && mod.key === 'pa' ? 'left' : 'center', vertical: 'middle', wrapText: true }; if (mod.key === 'pi' && [2, 3, 5, 6].includes(i)) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: FRX_AM } }; }); });
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(linhas.length + 1, 2), column: cols.length } };
+  const ultima = Math.max(linhas.length + 1, 2), L2 = ws.getColumn(cols.length).letter;
+  if (faixa === 'Tabeladados') wb.definedNames.add(`'${nome}'!$A$1:$${L2}$${ultima}`, 'Tabeladados');
+  if (faixa === 'bancoquimicer') { wb.definedNames.add(`'${nome}'!$B$1:$${L2}$${ultima}`, 'bancoquimicer'); wb.definedNames.add(`'${nome}'!$B$2:$${L2}$${ultima}`, 'bancodados'); }
+  return ws;
+}
+
 const frxNum = (v) => { if (v == null || v === '') return ''; const s = String(v).trim(); return /^\d{1,15}$/.test(s) && !/^0\d/.test(s) ? Number(s) : s; };
 const revOf = (mod) => (codeOf(mod).split('·')[1] || '').trim() || 'Rev00';
 function frxFolha(wb, nome, L, recs) {
@@ -2080,10 +2122,11 @@ function frxFolha(wb, nome, L, recs) {
   L.cols.forEach(([h, , o], i) => { const c = hr.getCell(i + 1); c.value = h || null; c.font = fonte(12, true, o.hcor); c.fill = solido(o.hfill || FRX_AZ); c.border = borda; c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: !!o.wrap }; });
   recs.forEach((r, k) => {
     const ctx = { ev: evalRec(r, MODS[L.key]), sp: specOf(r, MODS[L.key]) || {} };
-    const row = ws.getRow(L.hdr + 1 + k);
+    const row = ws.getRow(L.hdr + 1 + k); if (L.altLinha) row.height = L.altLinha;
     L.cols.forEach(([, , o], i) => {
       const c = row.getCell(i + 1); let v = o.v(r, ctx); if (v === undefined) v = '';
-      c.value = v === '' ? null : v;
+      const fx = o.f ? o.f(L.hdr + 1 + k, r) : null;
+      c.value = fx ? { formula: fx, result: v === '' ? undefined : v } : (v === '' ? null : v);
       if (o.fmt) c.numFmt = o.fmt;
       c.font = fonte(o.sz || L.sz || 12); c.border = borda; c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: !!o.wrap };
       if (o.fill) c.fill = solido(o.fill);
@@ -2095,7 +2138,11 @@ function frxFolha(wb, nome, L, recs) {
     if (cf.regras) ws.addConditionalFormatting({ ref, rules: cf.regras.map(([op, val, cor], p) => ({ type: 'cellIs', operator: op, formulae: [String(val)], priority: p + 1, style: { font: { color: { argb: cor } } } })) });
     else ws.addConditionalFormatting({ ref, rules: [{ type: 'expression', formulae: [cf.expr.replace('{r}', String(L.hdr + 1))], priority: 1, style: { font: { color: { argb: cf.cor } } } }] });
   });
-  ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
+  const ult = L.hdr + Math.max(recs.length, 1) + 200;
+  if (L.unico) for (let n = L.hdr + 1; n <= ult; n++) ws.getCell(`${L.unico}${n}`).dataValidation = { type: 'custom', allowBlank: true, formulae: [`COUNTIF(${L.unico}:${L.unico},${L.unico}${n})<=1`], showErrorMessage: true, errorTitle: 'Ordem de produção repetida', error: 'Esta ordem de produção já foi lançada nesta aba.' };
+  if (L.validaData) for (let n = L.hdr + 1; n <= ult; n++) ws.getCell(`A${n}`).dataValidation = { type: 'date', operator: 'greaterThan', allowBlank: true, formulae: [new Date(Date.UTC(2022, 9, 1))], showErrorMessage: true, error: 'Informe uma data válida.' };
+  ws.pageSetup = { orientation: 'landscape', paperSize: 9, scale: L.escala || 80, margins: { left: 0.118, right: 0.118, top: 0.709, bottom: 0.709, header: 0.3, footer: 0.3 } };
+  ws.pageSetup.printTitlesRow = `${L.hdr}:${L.hdr}`;
   return ws;
 }
 function frxNomeArquivo(mod) {
@@ -2108,6 +2155,8 @@ async function planilhaFR(EX, mod) {
   const ordem = (a, b) => (a.data || '').localeCompare(b.data || '') || String(a.lote).localeCompare(String(b.lote), 'pt', { numeric: true });
   const prep = (r) => ({ ...r, _dt: r.data ? new Date(Date.UTC(+r.data.slice(0, 4), +r.data.slice(5, 7) - 1, +r.data.slice(8, 10))) : null });
   const wb = new EX.Workbook(); wb.creator = ACC.me?.nome || 'Quimicer'; wb.created = new Date(); wb.title = L.titulo;
+  wb.calcProperties = { fullCalcOnLoad: true };
+  frxDados(wb, mod);
   const meses = allMonths(mod).slice().sort(), ano = String(new Date().getFullYear());
   const antigos = meses.filter(m => m.slice(0, 4) < ano), atuais = meses.filter(m => m.slice(0, 4) >= ano);
   if (antigos.length) frxFolha(wb, L.historico, L, antigos.flatMap(m => allRecs(m, mod)).sort(ordem).map(prep));
