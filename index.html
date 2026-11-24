@@ -199,6 +199,10 @@ table.facol td.cur { background: #FFF4CC }
 table.facol input { width: 42px; text-align: center; padding: 5px 2px; border: 1px solid transparent; border-radius: 5px; background: transparent; font: inherit; font-variant-numeric: tabular-nums }
 table.facol input:hover, table.facol input:focus { border-color: var(--line); background: #fff }
 table.facol input.proj { color: #8a8f98; font-style: italic }
+table.facol input.auto { color: #1a5fb4 }
+table.facol input.man { color: var(--ink); font-weight: 700 }
+.falg { display: inline-flex; align-items: center; gap: 5px; margin-right: 14px; white-space: nowrap }
+.falg i { display: inline-block; width: 10px; height: 10px; border-radius: 2px }
 table.facol tr.tot td { background: #F1F1EF; font-weight: 700 }
 .fst { display: inline-block; padding: 3px 8px; border-radius: 999px; font-weight: 700; font-size: 11.5px; white-space: nowrap }
 .fst.ok { background: #339933; color: #fff } .fst.at { background: #FFFF00; color: #4D3B00 } .fst.cr { background: #C00000; color: #fff } .fst.sd { background: #F1F1EF; color: #898781 }
@@ -631,6 +635,8 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
     <div id="faKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px"></div>
     <div class="panel"><div class="hd"><span class="label">Indicadores</span><span class="src" id="faInfo"></span></div>
       <div class="bd" style="padding-top:6px"><div style="overflow-x:auto"><table class="facol" id="faTab"></table></div>
+      <div class="src" style="margin-top:8px"><span class="falg"><i style="background:#1a5fb4"></i><b style="color:#1a5fb4">azul</b> = calculado pelo app</span><span class="falg"><i style="background:#0b0b0b"></i><b>negrito</b> = digitado (apague para voltar ao automático)</span><span class="falg"><i style="background:#8a8f98"></i><i style="background:none;width:auto;height:auto;font-style:italic;color:#8a8f98">cinza</i> = projeção da planilha</span></div>
+      <div id="faDet" style="margin-top:10px"></div>
       <div class="src" style="margin-top:8px">Valores em cinza itálico são a projeção da planilha original; ao digitar o valor real do mês ele substitui a projeção. Acum./Média = média dos meses preenchidos (zeros não contam). Atingimento: maior é melhor = média ÷ meta; menor é melhor = meta ÷ média (máximo 150%). Status: ≥100% Dentro da Meta, ≥80% Atenção, abaixo Crítico.</div></div></div>
     <div class="panel" style="margin-top:14px"><div class="hd"><span class="label">Observações / Plano de Ação da Área (ISO 9001, cláusula 10.2)</span><span class="src" id="faPlanoMes"></span></div>
       <div class="bd"><textarea id="faPlano" rows="6" style="width:100%" placeholder="Análise do mês, causas dos desvios e ações (o quê, quem, quando)."></textarea></div></div>
@@ -1767,6 +1773,7 @@ document.querySelectorAll('dialog [data-close]').forEach(b => b.addEventListener
 /* ---------- data ---------- */
 function rerender(mod) {
   if (S.tab === 'indicadores') { clearTimeout(IND.t); IND.t = setTimeout(renderIndicadores, 300); }
+  if (S.tab === 'farol') faAgendar();
   if (mod.key === 'mp') { updateVencAlert(); if (S.tab === 'validades' && M.key === 'mp') renderValidades(); }
   if (mod.key !== M.key) return;
   if (S.tab === 'especificacoes') { clearTimeout(IND.ts); IND.ts = setTimeout(renderSpecs, 300); }
@@ -1878,7 +1885,7 @@ $('espForm').addEventListener('submit', async (e) => {
 });
 function startEsp() {
   if (ESP.started || !S.db) return; ESP.started = true;
-  S.db.collection('esp_revisoes').onSnapshot((snap) => { ESP.revs = snap.docs.map(x => ({ ...x.data(), _id: x.id })); ESP.loaded = true; if (S.tab === 'esp') renderEsp(); if (S.tab === 'indicadores') renderIndicadores(); }, () => { ESP.loaded = true; });
+  S.db.collection('esp_revisoes').onSnapshot((snap) => { ESP.revs = snap.docs.map(x => ({ ...x.data(), _id: x.id })); ESP.loaded = true; if (S.tab === 'esp') renderEsp(); if (S.tab === 'farol') faAgendar(); if (S.tab === 'indicadores') renderIndicadores(); }, () => { ESP.loaded = true; });
 }
 
 
@@ -1902,7 +1909,48 @@ function faNovoDoc(ano) {
   d.indicadores.forEach(i => { i.valores = Array(12).fill(null); if (String(ano) !== '2026') i.proj = Array(12).fill(null); });
   d.planos = {}; return d;
 }
-const faVal = (i, k) => i.valores[k] ?? i.proj?.[k] ?? null;
+const FAROL_INICIO_APP = '2026-10'; // a partir deste mês RNC, laudos e cadastros passaram a ser feitos no app
+let FA_AUTO = null, FA_T = null;
+function faAgendar() { clearTimeout(FA_T); FA_T = setTimeout(() => { FA_AUTO = null; faRender(); }, 300); }
+function faAuto(ano) {
+  if (FA_AUTO && FA_AUTO.ano === ano) return FA_AUTO;
+  const out = { ano, v: {}, det: {}, pronto: ['pa', 'pi', 'mp'].every(k => D[k].loaded) };
+  const ids = ['conf', 'ncc', 'recl', 'prazo', 'novos']; ids.forEach(id => { out.v[id] = Array(12).fill(null); out.det[id] = Array(12).fill(''); });
+  const hojeM = mesAtual();
+  const rncMes = (x) => String(x.data || x.criadoEm || '').slice(0, 7);
+  const ehRecl = (x) => !!(x.origem && (x.origem.reclam || x.origem.cliExt));
+  for (let j = 0; j < 12; j++) {
+    const mes = `${ano}-${String(j + 1).padStart(2, '0')}`; if (mes > hojeM) continue;
+    // 1) conformidade: lotes liberados no mês, aprovados e sem nenhum ensaio fora da especificação
+    let tot = 0, ok = 0, fora = 0, nap = 0;
+    ['pa', 'pi', 'mp'].forEach(k => allRecs(mes, MODS[k]).forEach(r => {
+      if (!r.produto || !r.data) return; tot++;
+      const aprov = /^APROV/i.test(r.situacao || ''), f = evalRec(r, MODS[k]).fora.length;
+      if (aprov && !f) ok++; else { if (f) fora++; if (!aprov) nap++; }
+    }));
+    if (tot) { out.v.conf[j] = Math.round(ok / tot * 1000) / 10; out.det.conf[j] = `${ok} de ${tot} lotes conformes (${fora} com ensaio fora da especificação, ${nap} não aprovados)`; }
+    if (mes < FAROL_INICIO_APP) continue;
+    // 2) e 3) RNC do mês
+    if (RNC.loaded) {
+      const l = RNC.list.filter(x => rncMes(x) === mes), rec = l.filter(ehRecl);
+      out.v.ncc[j] = l.length - rec.length; out.det.ncc[j] = `${l.length - rec.length} RNC aberta(s) no mês (exceto reclamações de clientes)`;
+      out.v.recl[j] = rec.length; out.det.recl[j] = `${rec.length} RNC com origem "Reclamações de clientes" ou "Cliente externo"`;
+    }
+    // 4) prazo do laudo: do envio pelo laboratório até a emissão pelo faturamento
+    const hs = (LZ.all || []).filter(h => h.emitidoEm && h.preparadoEm && String(h.emitidoEm).slice(0, 7) === mes).map(h => (new Date(h.emitidoEm) - new Date(h.preparadoEm)) / 36e5).filter(h => h >= 0);
+    if (hs.length) { out.v.prazo[j] = Math.round(hs.reduce((a, b) => a + b, 0) / hs.length * 10) / 10; out.det.prazo[j] = `média de ${hs.length} laudo(s) emitido(s): do envio ao faturamento até a emissão`; }
+    else { out.v.prazo[j] = null; out.det.prazo[j] = ''; }
+    // 5) novos produtos / formulações (PA e PI) cadastrados no mês
+    const nomes = new Set();
+    ['pa', 'pi'].forEach(k => D[k].itens.forEach(it => { if (it.criadoEm && String(it.criadoEm).slice(0, 7) === mes) nomes.add(k + '|' + normNome(it.nome)); }));
+    (ESP.revs || []).forEach(r => { if (r.tipo === 'inclusao' && r.item && String(r.data || '').slice(0, 7) === mes) nomes.add((r.mod || 'pa') + '|' + normNome(r.item)); });
+    out.v.novos[j] = nomes.size; out.det.novos[j] = nomes.size ? `${nomes.size} item(ns) novo(s): ${[...nomes].map(x => x.split('|')[1]).slice(0, 8).join(', ')}${nomes.size > 8 ? '…' : ''}` : 'nenhum item novo cadastrado no mês';
+  }
+  if (out.pronto && RNC.loaded) FA_AUTO = out;
+  return out;
+}
+const faAutoV = (i, k) => { const a = faAuto(FA.ano); return a.v[i.id] ? a.v[i.id][k] : null; };
+const faVal = (i, k) => i.valores[k] ?? faAutoV(i, k) ?? i.proj?.[k] ?? null;
 function faCalc(i) {
   const vs = FAROL_MESES.map((m, k) => faVal(i, k)).filter(v => v != null && v !== 0);
   const q = vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : 0, d = Number(i.meta) || 0;
@@ -1916,6 +1964,7 @@ function faScore(doc) {
   return { r, st: r === 0 ? 'Sem dados' : r >= 100 ? 'Dentro da Meta' : r >= 80 ? 'Atenção' : 'Crítico', pesos: doc.indicadores.reduce((a, i) => a + (Number(i.peso) || 0), 0) };
 }
 async function abrirFarol() {
+  ['pa', 'pi', 'mp'].forEach(k => { startModule(k); ensureAll(MODS[k]); }); startRnc(); startEsp();
   const anoAtual = new Date().getFullYear();
   if (!FA.ano) {
     $('faAno').innerHTML = [anoAtual - 1, anoAtual, anoAtual + 1].map(a => `<option${a === anoAtual ? ' selected' : ''}>${a}</option>`).join('');
@@ -1925,7 +1974,7 @@ async function abrirFarol() {
 }
 async function faCarregar(force) {
   if (!force && FA.sujo && !confirm('Há alterações não salvas no Farol. Descartar?')) { $('faAno').value = FA.ano; return; }
-  FA.ano = +$('faAno').value; FA.sujo = false; FA.metas = false; FA.doc = null; faRender();
+  FA.ano = +$('faAno').value; FA_AUTO = null; FA.sujo = false; FA.metas = false; FA.doc = null; faRender();
   try { const d = await S.db.doc(`config/farol_tq_${FA.ano}`).get(); FA.doc = d.exists && d.data() ? d.data() : faNovoDoc(FA.ano); }
   catch { FA.doc = faNovoDoc(FA.ano); toast('Não foi possível carregar o Farol salvo; mostrando o modelo.'); }
   FA.doc.indicadores.forEach(i => { if (!Array.isArray(i.valores)) i.valores = Array(12).fill(null); });
@@ -1947,9 +1996,16 @@ function faRender() {
     return `<tr><td class="ind">${FA.metas ? `<input data-fm="${k}|nome" value="${esc(i.nome)}" style="width:100%;text-align:left;border-color:var(--line);background:#fff">` : esc(i.nome)}</td><td>${ed(k, 'peso', i.peso, 44)}</td>
       <td>${FA.metas ? `<select data-fm="${k}|dir"><option value="maior"${i.dir === 'maior' ? ' selected' : ''}>Maior é melhor</option><option value="menor"${i.dir === 'menor' ? ' selected' : ''}>Menor é melhor</option></select>` : (i.dir === 'menor' ? '<span title="Menor é melhor" style="white-space:nowrap">↓ menor</span>' : '<span title="Maior é melhor" style="white-space:nowrap">↑ maior</span>')}</td>
       <td>${ed(k, 'meta', i.meta)}</td>
-      ${FAROL_MESES.map((m, j) => { const real = i.valores[j], pj = i.proj?.[j], v = real ?? pj, proj = real == null && pj != null; return `<td${j === mes ? ' class="cur"' : ''}><input data-fv="${k}|${j}" inputmode="decimal" value="${v == null ? '' : String(v).replace('.', ',')}" class="${proj ? 'proj' : ''}" title="${proj ? 'Projeção da planilha — digite o valor real' : ''}"${pode ? '' : ' readonly'}></td>`; }).join('')}
+      ${FAROL_MESES.map((m, j) => { const real = i.valores[j], au = real == null ? faAutoV(i, j) : null, pj = i.proj?.[j], v = real ?? au ?? pj;
+        const cls = real != null ? 'man' : au != null ? 'auto' : (pj != null ? 'proj' : '');
+        const tit = real != null ? 'Valor digitado' + (faAutoV(i, j) != null ? ` (o app calculou ${faNum(faAutoV(i, j), 2)}; apague para voltar ao automático)` : '') : au != null ? 'Calculado pelo app: ' + (faAuto(FA.ano).det[i.id]?.[j] || '') : pj != null ? 'Projeção da planilha — digite o valor real' : '';
+        return `<td${j === mes ? ' class="cur"' : ''}><input data-fv="${k}|${j}" inputmode="decimal" value="${v == null ? '' : String(v).replace('.', ',')}" class="${cls}" title="${esc(tit)}"${pode ? '' : ' readonly'}></td>`; }).join('')}
       <td class="num"><b>${faNum(c.q, 2)}</b></td><td class="num">${faNum(c.r, 1)}</td><td><span class="fst ${faStCls(c.st)}">${c.st}</span></td></tr>`; }).join('');
   $('faTab').innerHTML = th + rows + `<tr class="tot"><td class="ind">Soma dos Pesos (deve ser 100%)</td><td>${sc.pesos}</td><td colspan="17"></td></tr><tr class="tot"><td class="ind">Score Ponderado da Área</td><td colspan="16"></td><td class="num">${faNum(sc.r, 1)}</td><td><span class="fst ${faStCls(sc.st)}">${sc.st}</span></td></tr>`;
+  const au = faAuto(FA.ano);
+  $('faDet').innerHTML = `<div class="label" style="margin-bottom:6px">De onde vêm os números de ${FAROL_MESES[mes]}/${FA.ano}${au.pronto && RNC.loaded ? '' : ' · <span class="src">carregando dados do app…</span>'}</div>` + doc.indicadores.map(i => { const r = i.valores[mes], a = au.v[i.id]?.[mes], d = au.det[i.id]?.[mes];
+    const txt = r != null ? `<b>${faNum(r, 2)}</b> digitado${a != null ? ` · app calculou ${faNum(a, 2)} (${esc(d)})` : ''}` : a != null ? `<b style="color:#1a5fb4">${faNum(a, 2)}</b> · ${esc(d)}` : (au.v[i.id] ? (`${FA.ano}-${String(mes + 1).padStart(2, '0')}` < FAROL_INICIO_APP && i.id !== 'conf' ? 'antes do uso do app (out/2026): vale a projeção ou o valor digitado' : 'sem dados no app para este mês') : 'indicador sem cálculo automático');
+    return `<div class="src" style="padding:3px 0;border-top:1px dashed var(--line)"><span style="display:inline-block;min-width:280px;color:var(--ink)">${esc(i.nome)}</span> ${txt}</div>`; }).join('');
   const chave = `${FA.ano}-${String(mes + 1).padStart(2, '0')}`;
   if (document.activeElement !== $('faPlano')) $('faPlano').value = doc.planos[chave] || '';
   $('faPlanoMes').textContent = `${FAROL_MESES[mes]}/${FA.ano}`;
@@ -1971,7 +2027,7 @@ $('faSalvar').addEventListener('click', async () => {
   if (!FA.doc || !faPode()) return;
   const b = $('faSalvar'); b.disabled = true;
   try {
-    const doc = { ...FA.doc, atualizadoEm: new Date().toISOString(), atualizadoPor: ACC.me?.nome || '' };
+    const au = faAuto(FA.ano); const doc = { ...FA.doc, auto: au.v, atualizadoEm: new Date().toISOString(), atualizadoPor: ACC.me?.nome || '' };
     await S.db.doc(`config/farol_tq_${FA.ano}`).set(doc); FA.doc = doc; FA.sujo = false; FA.metas = false; faRender(); toast('Farol salvo');
   } catch { toast('Não foi possível salvar o Farol. Verifique a conexão.'); }
   finally { b.disabled = false; }
@@ -2962,7 +3018,7 @@ const rncKey = (mod, r) => `${mod}|${normNome(r.produto)}|${normLote(r.lote)}|${
 function rncDoRec(r, modKey) { const k = rncKey(modKey, r); return RNC.list.find(x => x.chave === k) || null; }
 function startRnc() {
   if (RNC.started || !S.db) return; RNC.started = true;
-  S.db.collection('rnc').onSnapshot((snap) => { RNC.list = snap.docs.map(x => ({ ...x.data(), _id: x.id })); RNC.loaded = true; if (S.tab === 'rnc') renderRnc(); }, () => {});
+  S.db.collection('rnc').onSnapshot((snap) => { RNC.list = snap.docs.map(x => ({ ...x.data(), _id: x.id })); RNC.loaded = true; if (S.tab === 'rnc') renderRnc(); if (S.tab === 'farol') faAgendar(); }, () => {});
 }
 function proxNumRnc(data) {
   const ano = (data || hoje()).slice(0, 4);
