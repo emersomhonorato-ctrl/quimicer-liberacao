@@ -188,6 +188,21 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 13px; min-width:
 .lnav .cnt { display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; margin-left: 4px }
 .lnav .cnt:empty { display: none }
 details.lcfg summary { cursor: pointer; list-style: revert }
+.fhead { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; justify-content: space-between; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-bottom: 14px }
+table.facol { border-collapse: collapse; width: 100%; min-width: 1080px; font-size: 12.5px }
+table.facol th { background: #184F95; color: #fff; font-weight: 700; padding: 7px 3px; border: 1px solid #d9dde3; text-align: center; white-space: nowrap }
+table.facol th.cur { background: #0d3a73; box-shadow: inset 0 -3px 0 #FFE699 }
+table.facol td { border: 1px solid #e3e6ea; padding: 4px; text-align: center; vertical-align: middle }
+table.facol td.ind { text-align: left; font-weight: 600; min-width: 170px; padding: 6px 8px; position: sticky; left: 0; background: var(--surface); z-index: 1 }
+table.facol th:first-child { position: sticky; left: 0; z-index: 2 }
+table.facol td.cur { background: #FFF4CC }
+table.facol input { width: 42px; text-align: center; padding: 5px 2px; border: 1px solid transparent; border-radius: 5px; background: transparent; font: inherit; font-variant-numeric: tabular-nums }
+table.facol input:hover, table.facol input:focus { border-color: var(--line); background: #fff }
+table.facol input.proj { color: #8a8f98; font-style: italic }
+table.facol tr.tot td { background: #F1F1EF; font-weight: 700 }
+.fst { display: inline-block; padding: 3px 8px; border-radius: 999px; font-weight: 700; font-size: 11.5px; white-space: nowrap }
+.fst.ok { background: #339933; color: #fff } .fst.at { background: #FFFF00; color: #4D3B00 } .fst.cr { background: #C00000; color: #fff } .fst.sd { background: #F1F1EF; color: #898781 }
+
 #leBody tr { cursor: pointer }
 @media (max-width: 700px) { .lfgrid { grid-template-columns: 1fr 1fr !important } .lfgrid > .field:first-child { grid-column: 1 / -1 } }
 .laudos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 20px; align-items: start }
@@ -315,6 +330,7 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       <a href="#esp" data-tab="esp">Revisões ESP</a>
       <a href="#rnc" data-tab="rnc">RNC</a>
       <a href="#indicadores" data-tab="indicadores">Indicadores</a>
+      <a href="#farol" data-tab="farol">Farol</a>
       <a href="#laudos" data-tab="laudos" id="tabLaudos">Laudos</a>
       <a href="#validades" data-tab="validades" id="tabVal" hidden>Validades</a>
     </nav>
@@ -599,6 +615,25 @@ html, body { margin: 0 } body { font-size: 14px; -webkit-text-size-adjust: 100% 
       </div></div>
     <div class="panel" id="ind2Panel" style="margin-top:14px"><div class="hd"><span class="label">Sem liberação há 2 anos</span><span class="src" id="ind2N"></span></div>
       <div class="bd" style="padding-top:6px"><div class="src" id="ind2Info" style="margin-bottom:8px"></div><div style="overflow-x:auto;max-height:460px"><table class="acc"><thead><tr><th>Item</th><th>Form.</th><th>Última liberação</th><th>Sem liberar há</th><th></th></tr></thead><tbody id="ind2Body"></tbody></table></div></div></div>
+  </section>
+  <section class="view" id="v-farol" hidden>
+    <div class="fhead">
+      <div><div class="label">Farol de Indicadores · Área: Técnica e Qualidade</div>
+        <div style="font-family:var(--f-display);font-weight:700;font-size:28px;line-height:1.1">Farol <span id="faAnoTxt"></span></div>
+        <div class="src" id="faOkr"></div><div class="src" id="faResp"></div></div>
+      <div class="row" style="gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div class="field"><label for="faAno">Ano</label><select id="faAno"></select></div>
+        <div class="field"><label for="faMes">Mês de apuração</label><select id="faMes"></select></div>
+        <button type="button" class="btn" id="faMetas" hidden>Editar metas e pesos</button>
+        <button type="button" class="btn primary" id="faSalvar">Salvar</button>
+      </div>
+    </div>
+    <div id="faKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px"></div>
+    <div class="panel"><div class="hd"><span class="label">Indicadores</span><span class="src" id="faInfo"></span></div>
+      <div class="bd" style="padding-top:6px"><div style="overflow-x:auto"><table class="facol" id="faTab"></table></div>
+      <div class="src" style="margin-top:8px">Valores em cinza itálico são a projeção da planilha original; ao digitar o valor real do mês ele substitui a projeção. Acum./Média = média dos meses preenchidos (zeros não contam). Atingimento: maior é melhor = média ÷ meta; menor é melhor = meta ÷ média (máximo 150%). Status: ≥100% Dentro da Meta, ≥80% Atenção, abaixo Crítico.</div></div></div>
+    <div class="panel" style="margin-top:14px"><div class="hd"><span class="label">Observações / Plano de Ação da Área (ISO 9001, cláusula 10.2)</span><span class="src" id="faPlanoMes"></span></div>
+      <div class="bd"><textarea id="faPlano" rows="6" style="width:100%" placeholder="Análise do mês, causas dos desvios e ações (o quê, quem, quando)."></textarea></div></div>
   </section>
 
 <dialog id="dRnc" style="width:min(960px,calc(100vw - 16px))"><form id="rncForm" novalidate>
@@ -929,7 +964,7 @@ function banner(msg) { const b = $('banner'); b.textContent = msg || ''; b.hidde
 function conn(state, txt) { $('connDot').className = 'dot ' + (state || ''); $('connTxt').textContent = txt; }
 
 /* ---------- navigation ---------- */
-const TABS = ['liberar', 'registros', 'especificacoes', 'esp', 'rnc', 'indicadores', 'laudos', 'validades'];
+const TABS = ['liberar', 'registros', 'especificacoes', 'esp', 'rnc', 'indicadores', 'farol', 'laudos', 'validades'];
 const hashFor = (tab) => '#' + (M.key === 'pa' ? '' : M.key + '-') + tab;
 function route() {
   const h = location.hash.slice(1);
@@ -947,7 +982,7 @@ document.addEventListener('click', (e) => {
 });
 document.querySelectorAll('[data-mod]').forEach(b => b.addEventListener('click', () => { if (b.dataset.mod !== M.key) { setModule(b.dataset.mod, true); history.replaceState(null, '', hashFor(S.tab)); showTab(S.tab); } }));
 
-const QUAL_TABS = ['especificacoes', 'esp', 'rnc', 'indicadores'];
+const QUAL_TABS = ['especificacoes', 'esp', 'rnc', 'indicadores', 'farol'];
 function tabOk(t) {
   const p = S.perfil;
   if (p === 'faturamento') return t === 'laudos';
@@ -969,6 +1004,7 @@ function showTab(t) {
   if (t === 'esp') renderEsp();
   if (t === 'rnc') { ['pa', 'pi', 'mp'].forEach(k => { startModule(k); if (S.perfil !== 'qualidade') ensureAll(MODS[k]); }); startRnc(); renderRnc(); }
   if (t === 'indicadores') { ['pa', 'pi', 'mp'].forEach(k => { startModule(k); ensureAll(MODS[k]); }); startEsp(); renderIndicadores(); }
+  if (t === 'farol') abrirFarol();
 }
 function setModule(key, user) {
   M = MODS[key]; store.set('fr.mod', key);
@@ -1845,6 +1881,102 @@ function startEsp() {
   S.db.collection('esp_revisoes').onSnapshot((snap) => { ESP.revs = snap.docs.map(x => ({ ...x.data(), _id: x.id })); ESP.loaded = true; if (S.tab === 'esp') renderEsp(); if (S.tab === 'indicadores') renderIndicadores(); }, () => { ESP.loaded = true; });
 }
 
+
+/* ---------- Farol de Indicadores · Técnica e Qualidade ---------- */
+const FAROL_MESES = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+const FAROL_PADRAO = {
+  okr: 'Qualidade e Conformidade (SGQ); Inovação e Desenvolvimento de Produtos',
+  responsavel: 'Gerência Técnica / Gerência Industrial e Qualidade',
+  indicadores: [
+    { id: 'conf', nome: 'Taxa de Conformidade em Ensaios / Inspeções (%)', peso: 25, dir: 'maior', meta: 98, proj: [88.4, 103.6, 100, 91.4, 98.5, 75.3, 98.8, 119.4, 104.5, 92.8, 91.2, 107.2] },
+    { id: 'ncc', nome: 'Não Conformidades Críticas (un.)', peso: 20, dir: 'menor', meta: 2, proj: [2, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2] },
+    { id: 'recl', nome: 'Reclamações de Clientes Críticas (un.)', peso: 20, dir: 'menor', meta: 3, proj: [4, 4, 5, 3, 4, 3, 3, 4, 3, 4, 3, 3] },
+    { id: 'prazo', nome: 'Prazo Médio de Liberação de Laudo Técnico (horas)', peso: 15, dir: 'menor', meta: 24, proj: [21.1, 24.3, 22.9, 25.4, 19.5, 23, 22.1, 17.5, 25.7, 20.9, 20, 20.5] },
+    { id: 'novos', nome: 'Novos Produtos / Formulações Homologadas (un.)', peso: 20, dir: 'maior', meta: 1, proj: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
+  ],
+};
+const FA = { ano: null, doc: null, sujo: false, metas: false };
+const faPode = () => S.perfil === 'admin' || S.perfil === 'laboratorio' || S.perfil === 'qualidade';
+function faNovoDoc(ano) {
+  const d = JSON.parse(JSON.stringify(FAROL_PADRAO)); d.ano = ano;
+  d.indicadores.forEach(i => { i.valores = Array(12).fill(null); if (String(ano) !== '2026') i.proj = Array(12).fill(null); });
+  d.planos = {}; return d;
+}
+const faVal = (i, k) => i.valores[k] ?? i.proj?.[k] ?? null;
+function faCalc(i) {
+  const vs = FAROL_MESES.map((m, k) => faVal(i, k)).filter(v => v != null && v !== 0);
+  const q = vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : 0, d = Number(i.meta) || 0;
+  const r = i.dir === 'menor' ? (q === 0 ? 0 : Math.min(d / q * 100, 150)) : (d ? q / d * 100 : 0);
+  return { q, r, st: (q === 0 || d === 0) ? 'Sem dados' : r >= 100 ? 'Dentro da Meta' : r >= 80 ? 'Atenção' : 'Crítico' };
+}
+const faStCls = (st) => ({ 'Dentro da Meta': 'ok', 'Atenção': 'at', 'Crítico': 'cr' }[st] || 'sd');
+const faNum = (n, dec = 1) => n == null ? '' : Number(n).toLocaleString('pt-BR', { maximumFractionDigits: dec });
+function faScore(doc) {
+  const rs = doc.indicadores.map(faCalc), r = doc.indicadores.reduce((a, i, k) => a + (Number(i.peso) || 0) * rs[k].r, 0) / 100;
+  return { r, st: r === 0 ? 'Sem dados' : r >= 100 ? 'Dentro da Meta' : r >= 80 ? 'Atenção' : 'Crítico', pesos: doc.indicadores.reduce((a, i) => a + (Number(i.peso) || 0), 0) };
+}
+async function abrirFarol() {
+  const anoAtual = new Date().getFullYear();
+  if (!FA.ano) {
+    $('faAno').innerHTML = [anoAtual - 1, anoAtual, anoAtual + 1].map(a => `<option${a === anoAtual ? ' selected' : ''}>${a}</option>`).join('');
+    $('faMes').innerHTML = FAROL_MESES.map((m, k) => `<option value="${k}"${k === new Date().getMonth() ? ' selected' : ''}>${m}</option>`).join('');
+    FA.ano = anoAtual; await faCarregar(true);
+  } else faRender();
+}
+async function faCarregar(force) {
+  if (!force && FA.sujo && !confirm('Há alterações não salvas no Farol. Descartar?')) { $('faAno').value = FA.ano; return; }
+  FA.ano = +$('faAno').value; FA.sujo = false; FA.metas = false; FA.doc = null; faRender();
+  try { const d = await S.db.doc(`config/farol_tq_${FA.ano}`).get(); FA.doc = d.exists && d.data() ? d.data() : faNovoDoc(FA.ano); }
+  catch { FA.doc = faNovoDoc(FA.ano); toast('Não foi possível carregar o Farol salvo; mostrando o modelo.'); }
+  FA.doc.indicadores.forEach(i => { if (!Array.isArray(i.valores)) i.valores = Array(12).fill(null); });
+  FA.doc.planos = FA.doc.planos || {};
+  faRender();
+}
+function faRender() {
+  const doc = FA.doc, mes = +$('faMes').value, pode = faPode(), admin = S.perfil === 'admin';
+  $('faAnoTxt').textContent = FA.ano || ''; $('faMetas').hidden = !admin; $('faSalvar').hidden = !pode; $('faPlano').readOnly = !pode;
+  $('faMetas').textContent = FA.metas ? 'Concluir edição de metas' : 'Editar metas e pesos';
+  if (!doc) { $('faTab').innerHTML = '<tr><td class="src">Carregando…</td></tr>'; $('faKpis').innerHTML = ''; return; }
+  $('faOkr').textContent = 'OKR(s) da Diretoria vinculado(s): ' + (doc.okr || ''); $('faResp').textContent = 'Responsável: ' + (doc.responsavel || '');
+  const sc = faScore(doc), rs = doc.indicadores.map(faCalc), cont = (st) => rs.filter(x => x.st === st).length;
+  const kpi = (v, l, sub, cls) => `<div class="panel" style="padding:12px 16px">${cls ? `<span class="fst ${cls}" style="float:right">${sub}</span>` : ''}<div style="font-family:var(--f-display);font-weight:700;font-size:26px;line-height:1.1">${v}</div><div class="label" style="margin-top:4px">${l}</div>${cls ? '' : `<div class="src">${sub || ''}</div>`}</div>`;
+  $('faKpis').innerHTML = kpi(faNum(sc.r) + '%', 'Score ponderado da área', sc.st, faStCls(sc.st)) + kpi(cont('Dentro da Meta'), 'Dentro da meta', 'indicadores') + kpi(cont('Atenção'), 'Atenção', 'indicadores') + kpi(cont('Crítico'), 'Crítico', 'indicadores') + kpi(sc.pesos + '%', 'Soma dos pesos', sc.pesos === 100 ? 'ok (deve ser 100%)' : 'atenção: deve ser 100%');
+  const th = `<tr><th style="text-align:left">Indicador</th><th title="Peso (%)">Peso</th><th>Direção</th><th>Meta</th>${FAROL_MESES.map((m, k) => `<th${k === mes ? ' class="cur"' : ''}>${m}</th>`).join('')}<th>Média</th><th>Ating. (%)</th><th>Status</th></tr>`;
+  const ed = (k, campo, v, w) => FA.metas ? `<input data-fm="${k}|${campo}" value="${v == null ? '' : String(v).replace('.', ',')}" style="width:${w || 56}px;border-color:var(--line);background:#fff">` : esc(faNum(v, 2));
+  const rows = doc.indicadores.map((i, k) => { const c = rs[k];
+    return `<tr><td class="ind">${FA.metas ? `<input data-fm="${k}|nome" value="${esc(i.nome)}" style="width:100%;text-align:left;border-color:var(--line);background:#fff">` : esc(i.nome)}</td><td>${ed(k, 'peso', i.peso, 44)}</td>
+      <td>${FA.metas ? `<select data-fm="${k}|dir"><option value="maior"${i.dir === 'maior' ? ' selected' : ''}>Maior é melhor</option><option value="menor"${i.dir === 'menor' ? ' selected' : ''}>Menor é melhor</option></select>` : (i.dir === 'menor' ? '<span title="Menor é melhor" style="white-space:nowrap">↓ menor</span>' : '<span title="Maior é melhor" style="white-space:nowrap">↑ maior</span>')}</td>
+      <td>${ed(k, 'meta', i.meta)}</td>
+      ${FAROL_MESES.map((m, j) => { const real = i.valores[j], pj = i.proj?.[j], v = real ?? pj, proj = real == null && pj != null; return `<td${j === mes ? ' class="cur"' : ''}><input data-fv="${k}|${j}" inputmode="decimal" value="${v == null ? '' : String(v).replace('.', ',')}" class="${proj ? 'proj' : ''}" title="${proj ? 'Projeção da planilha — digite o valor real' : ''}"${pode ? '' : ' readonly'}></td>`; }).join('')}
+      <td class="num"><b>${faNum(c.q, 2)}</b></td><td class="num">${faNum(c.r, 1)}</td><td><span class="fst ${faStCls(c.st)}">${c.st}</span></td></tr>`; }).join('');
+  $('faTab').innerHTML = th + rows + `<tr class="tot"><td class="ind">Soma dos Pesos (deve ser 100%)</td><td>${sc.pesos}</td><td colspan="17"></td></tr><tr class="tot"><td class="ind">Score Ponderado da Área</td><td colspan="16"></td><td class="num">${faNum(sc.r, 1)}</td><td><span class="fst ${faStCls(sc.st)}">${sc.st}</span></td></tr>`;
+  const chave = `${FA.ano}-${String(mes + 1).padStart(2, '0')}`;
+  if (document.activeElement !== $('faPlano')) $('faPlano').value = doc.planos[chave] || '';
+  $('faPlanoMes').textContent = `${FAROL_MESES[mes]}/${FA.ano}`;
+  $('faInfo').textContent = FA.sujo ? 'Alterações não salvas' : (doc.atualizadoEm ? `Salvo em ${dt(doc.atualizadoEm)}${doc.atualizadoPor ? ' por ' + doc.atualizadoPor : ''}` : 'Ainda não salvo');
+}
+function faParse(v) { let t = String(v).trim(); if (!t) return null; if (/,/.test(t)) t = t.replace(/\./g, '').replace(',', '.'); const n = Number(t); return Number.isFinite(n) ? n : NaN; }
+$('faTab').addEventListener('change', (e) => {
+  const doc = FA.doc; if (!doc) return;
+  const fv = e.target.dataset.fv, fm = e.target.dataset.fm;
+  if (fv) { const [k, j] = fv.split('|').map(Number); const n = faParse(e.target.value); if (Number.isNaN(n)) { toast('Valor inválido. Use números, ex.: 98,5'); setTimeout(faRender, 0); return; } doc.indicadores[k].valores[j] = n; }
+  if (fm) { const [k, campo] = fm.split('|'); const i = doc.indicadores[+k]; if (campo === 'nome' || campo === 'dir') i[campo] = e.target.value; else { const n = faParse(e.target.value); if (Number.isNaN(n) || n == null) { toast('Valor inválido.'); setTimeout(faRender, 0); return; } i[campo] = n; } }
+  FA.sujo = true; setTimeout(faRender, 0);
+});
+$('faPlano').addEventListener('input', () => { if (!FA.doc) return; const mes = +$('faMes').value; FA.doc.planos[`${FA.ano}-${String(mes + 1).padStart(2, '0')}`] = $('faPlano').value; FA.sujo = true; $('faInfo').textContent = 'Alterações não salvas'; });
+$('faAno').addEventListener('change', () => faCarregar(false));
+$('faMes').addEventListener('change', faRender);
+$('faMetas').addEventListener('click', () => { FA.metas = !FA.metas; faRender(); });
+$('faSalvar').addEventListener('click', async () => {
+  if (!FA.doc || !faPode()) return;
+  const b = $('faSalvar'); b.disabled = true;
+  try {
+    const doc = { ...FA.doc, atualizadoEm: new Date().toISOString(), atualizadoPor: ACC.me?.nome || '' };
+    await S.db.doc(`config/farol_tq_${FA.ano}`).set(doc); FA.doc = doc; FA.sujo = false; FA.metas = false; faRender(); toast('Farol salvo');
+  } catch { toast('Não foi possível salvar o Farol. Verifique a conexão.'); }
+  finally { b.disabled = false; }
+});
+window.addEventListener('beforeunload', (e) => { if (FA.sujo) { e.preventDefault(); e.returnValue = ''; } });
 
 /* ---------- Indicadores ---------- */
 const IND = { t: null, ts: null };
