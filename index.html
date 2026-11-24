@@ -1931,7 +1931,11 @@ function faAuto(ano) {
       if (aprov && !f) ok++; else { if (f) fora++; if (!aprov) nap++; }
     }));
     if (tot) { out.v.conf[j] = Math.round(ok / tot * 1000) / 10; out.det.conf[j] = `${ok} de ${tot} lotes conformes (${fora} com ensaio fora da especificação, ${nap} não aprovados)`; }
-    if (mes < FAROL_INICIO_APP) continue;
+    if (mes < FAROL_INICIO_APP) {
+      // antes das RNC no app: não conformidades = lotes liberados com ensaio fora da especificação ou não aprovados (planilhas FR importadas)
+      if (tot) { out.v.ncc[j] = tot - ok; out.det.ncc[j] = `${tot - ok} lote(s) não conforme(s) nas liberações importadas das planilhas (${fora} com ensaio fora da especificação, ${nap} não aprovados) — antes das RNC no app`; }
+      continue;
+    }
     // 2) e 3) RNC do mês
     if (RNC.loaded) {
       const l = RNC.list.filter(x => rncMes(x) === mes), rec = l.filter(ehRecl);
@@ -2006,7 +2010,7 @@ function faRender() {
   $('faTab').innerHTML = th + rows + `<tr class="tot"><td class="ind">Soma dos Pesos (deve ser 100%)</td><td>${sc.pesos}</td><td colspan="17"></td></tr><tr class="tot"><td class="ind">Score Ponderado da Área</td><td colspan="16"></td><td class="num">${faNum(sc.r, 1)}</td><td><span class="fst ${faStCls(sc.st)}">${sc.st}</span></td></tr>`;
   const au = faAuto(FA.ano);
   $('faDet').innerHTML = `<div class="label" style="margin-bottom:6px">De onde vêm os números de ${FAROL_MESES[mes]}/${FA.ano}${au.pronto && RNC.loaded ? '' : ' · <span class="src">carregando dados do app…</span>'}</div>` + doc.indicadores.map(i => { const r = i.valores[mes], a = au.v[i.id]?.[mes], d = au.det[i.id]?.[mes];
-    const txt = r != null ? `<b>${faNum(r, 2)}</b> digitado${a != null ? ` · app calculou ${faNum(a, 2)} (${esc(d)})` : ''}` : a != null ? `<b style="color:#1a5fb4">${faNum(a, 2)}</b> · ${esc(d)}` : (au.v[i.id] ? (`${FA.ano}-${String(mes + 1).padStart(2, '0')}` < FAROL_INICIO_APP && i.id !== 'conf' ? 'antes do uso do app (out/2026): vale a projeção ou o valor digitado' : 'sem dados no app para este mês') : 'indicador sem cálculo automático');
+    const txt = r != null ? `<b>${faNum(r, 2)}</b> digitado${a != null ? ` · app calculou ${faNum(a, 2)} (${esc(d)})` : ''}` : a != null ? `<b style="color:#1a5fb4">${faNum(a, 2)}</b> · ${esc(d)}` : (au.v[i.id] ? (`${FA.ano}-${String(mes + 1).padStart(2, '0')}` < FAROL_INICIO_APP && i.id !== 'conf' && i.id !== 'ncc' ? 'sem esse dado no app antes de out/2026 (laudos, reclamações e cadastros eram feitos fora): vale a projeção ou o valor digitado' : 'sem dados no app para este mês') : 'indicador sem cálculo automático');
     return `<div class="src" style="padding:3px 0;border-top:1px dashed var(--line)"><span style="display:inline-block;min-width:280px;color:var(--ink)">${esc(i.nome)}</span> ${txt}</div>`; }).join('');
   const chave = `${FA.ano}-${String(mes + 1).padStart(2, '0')}`;
   if (document.activeElement !== $('faPlano')) $('faPlano').value = doc.planos[chave] || '';
